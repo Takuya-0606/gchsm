@@ -1,6 +1,6 @@
 # Gaussian charge distributed harmonic solvation model (GC-HSM)
 2025-10-26
-* [Documentation](https://)
+* [Document](document)
 * [Installation](#installation)
 * [Users guide](https://)
   
@@ -100,7 +100,7 @@ The commands below assume that you are starting from a terminal (macOS/Linux) or
 We hope this Conda-first distribution makes it easier to integrate GCHSM into your workflows!
 
 ## Note
-- For detailed operations of GCHSM, please refer to the [Documentation](https://).
+- For detailed operations of GCHSM, please refer to the [Document](document).
 - Polarizable continuum model based on gaussian charge scheme is also available through the following programs in addition to pyscf:
   * [ORCA](https://www.faccts.de/docs#orca)
   * [TURBOMOLE](https://www.turbomole.org/)
