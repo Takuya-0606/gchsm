@@ -1,5 +1,5 @@
 # Gaussian charge distributed harmonic solvation model (GC-HSM)
-2025-10-04
+2025-10-26
 * [Documentation](https://)
 * [Installation](#installation)
 * [Users guide](https://)
@@ -17,3 +17,7 @@ These modules can be installed using pip:
 ```
 pip install pyscf[all]
 ```
+## Note
+Polarizable continuum model based on gaussian charge scheme is also available through the following programs in addition to pyscf:
+* [ORCA](https://www.faccts.de/docs#orca)
+* [TURBOMOLE](https://www.turbomole.org/)
