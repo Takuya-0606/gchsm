@@ -17,6 +17,10 @@ These modules can be installed using pip:
 ```
 pip install pyscf[all]
 ```
+* Install GCHSM driver:
+```
+git clone https://hogehoge
+```
 ## Note
 Polarizable continuum model based on gaussian charge scheme is also available through the following programs in addition to pyscf:
 * [ORCA](https://www.faccts.de/docs#orca)
