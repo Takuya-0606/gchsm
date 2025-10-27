@@ -63,6 +63,17 @@ The commands below assume that you are starting from your terminal (macOS/Linux)
    ensure that the virtual environment is activated and that the installation
    step completed without errors.
 
+**2.5. Overwrite pyscf.**
+
+```bash
+cp code/pcm.py .name/lib/python3.12/site-packages/pyscf/solvent/pcm.py
+cp code/hessian/pcm.py .name/lib/python3.12/site-packages/pyscf/solvent/hessian/pcm.py
+```
+    
+The numerical second derivative calculation while keeping the PCM cavity fixed was 
+implemented by appending to the pyscf program.
+
+
 ## 3. Running calculation
 1. Prepare an input file that contains `%MAIN` and `%GEOMETRY` blocks.\
    An example named `input.inp` is shipped next to this README.
