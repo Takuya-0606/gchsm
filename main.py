@@ -219,7 +219,7 @@ def main():
 
         
         # optional PROJECT switch (effective only for hess)
-        project_flag = (kv.get("PROJECT", "FALSE").strip().upper() == "TRUE")
+        project_flag = (kv.get("PROJECT", "TRUE").strip().upper() == "TRUE")
 
         # freqtemp
         freqtemps = _parse_freqtemps(kv.get("FREQTEMP"))
