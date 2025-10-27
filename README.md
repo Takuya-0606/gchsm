@@ -68,10 +68,12 @@ The commands below assume that you are starting from your terminal (macOS/Linux)
 ```bash
 cp code/pcm.py .name/lib/python3.12/site-packages/pyscf/solvent/pcm.py
 cp code/hessian/pcm.py .name/lib/python3.12/site-packages/pyscf/solvent/hessian/pcm.py
+cp code/thermo.py .name/lib/python3.12/site-packages/pyscf/solvent/hessian/pcm.py
 ```
-    
-The numerical second derivative calculation while keeping the PCM cavity fixed was 
-implemented by appending to the pyscf program.
+
+The following program was implemented by appending to the pyscf program.
+- numerical second derivative calculation with fixed PCM cavity
+- Thermodynamics calculation
 
 
 ## 3. Running calculation
