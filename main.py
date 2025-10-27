@@ -29,12 +29,12 @@ import numpy as np
 from pyscf import gto
 
 # Local modules
-from driver.calctype import run_sp, run_opt, run_hess, run_mp2, run_sp_mp2, run_opt_mp2, thermo_tables_from_freqs, thermo_from_loaded_freqs
-from driver.method   import build_scf
-from driver.hsm      import parse_hsm, attach_pcm
-from driver.report   import build_report
-from driver.nonelst  import parse_nonelst_config, evaluate_nonelst
-from driver.freqonly import analyze_plaintext_freqout
+from .driver.calctype import run_sp, run_opt, run_hess, run_mp2, run_sp_mp2, run_opt_mp2, thermo_tables_from_freqs, thermo_from_loaded_freqs
+from .driver.method   import build_scf
+from .driver.hsm      import parse_hsm, attach_pcm
+from .driver.report   import build_report
+from .driver.nonelst  import parse_nonelst_config, evaluate_nonelst
+from .driver.freqonly import analyze_plaintext_freqout
 
 
 # time helpers
