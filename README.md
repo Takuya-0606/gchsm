@@ -53,15 +53,14 @@ The commands below assume that you are starting from your terminal (macOS/Linux)
   ```
   The installer downloads the required scientific libraries and places the `gchsm` command on your `PATH`.
 
-**2.4. Verify the installation.**
+**2.4. chack the installation.**
 
    ```bash
-   gchsm --help
+   which gchsm
    ```
 
-   The program prints a short usage message.  If the command is not found,
-   ensure that the virtual environment is activated and that the installation
-   step completed without errors.
+   If the result is `<your directory>/gchsm/.name/bin/gchsm`,\
+   Installation was completed.
 
 **2.5. Overwrite pyscf.**
 
