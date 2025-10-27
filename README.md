@@ -2,7 +2,6 @@
 2025-10-26
 * [Document](document)
 * [Installation](#installation)
-* [Users guide](https://)
   
 The source code for GC-HSM functions by connecting with [PySCF](https://github.com/pyscf/pyscf).\
 Please follow the steps below to set up your environment.
@@ -22,7 +21,7 @@ git clone https://hogehoge
 ```
 ## 1. Requirements
 
-- Python **3.1.0** or later.
+- Python **3.10** or later.
 - A working C/C++ toolchain is recommended bacause PySCF features compile on first use.
 - The package depends on `numpy`, `tabulate`, and `pyscf`. \
   These are installed automatically when you install `gchsm`.
@@ -37,7 +36,7 @@ The commands below assume that you are starting from a terminal (macOS/Linux) or
 
 **2.1. Download the source code.**
    ```bash
-   git clone <URL>
+   git clone https://github.com/Takuya-0606/gchsm.git
    cd hsm
    ```
 
