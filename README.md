@@ -39,12 +39,13 @@ The commands below assume that you are starting from your terminal (macOS/Linux)
 
 **2.2. Create and activate a dedicated Conda environment. (Recommended)**
   ```bash
-   python3 -m venv .name
+   python3.12 -m venv .name
    # Activate it
    source .name/bin/activate          # macOS / Linux
    # .name\Scripts\Activate.ps1      # Windows PowerShell
   ```
-  This environment contains Python itself, the scientific dependencies, and the tooling required to build the Conda package locally. Note that `source .name/bin/activate` is bash script.
+  This environment contains Python itself, the scientific dependencies, and the tooling required to build the Conda package locally. Note that `source .name/bin/activate` is bash script. If the Python version is lower than `3.10`, it will stop with an error.
+
 
 **2.3. Install the package in editable mode.**
   ```bash
