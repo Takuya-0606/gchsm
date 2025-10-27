@@ -76,11 +76,11 @@ def harmonic_analysis(mol, hess, exclude_trans=True, exclude_rot=True,
         P = numpy.eye(natm * 3) - q.dot(q.T)
         w, v = numpy.linalg.eigh(P)
         bvec = v[:,w > LINDEP_THRESHOLD]
-        remake = reduce(numpy.dot, (bvec.T, remake, bvec))
-        force_const_au, mode = numpy.linalg.eigh(remake)
+        remake = reduce(numpy.dot, (bvec.T, h, bvec))
+        force_const_au, mode = numpy.linalg.eigh(h)
         mode = bvec.dot(mode)
     else:
-        force_const_au, mode = numpy.linalg.eigh(remake)
+        force_const_au, mode = numpy.linalg.eigh(h)
 
     freq_au = numpy.lib.scimath.sqrt(force_const_au)
     results['freq_error'] = numpy.count_nonzero(freq_au.imag > 0)
