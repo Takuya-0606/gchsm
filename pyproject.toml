@@ -39,7 +39,8 @@ classifiers = [
 dependencies = [
   "numpy>=1.24",
   "tabulate>=0.9",
-  "pyscf=2.9.0"
+  "pyscf==2.9.0",
+  "geometric>=1.1"
 ]
 
 [project.scripts]
