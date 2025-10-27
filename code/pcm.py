@@ -510,6 +510,7 @@ class PCM(lib.StreamObject):
         self._intermediates.update(intermediates)
 
         charge_exp  = self.surface['charge_exp']
+        zeta        = charge_exp
         grid_coords = self.surface['grid_coords']
         atom_coords = mol.atom_coords(unit='B')
         atom_charges = mol.atom_charges()
@@ -559,13 +560,12 @@ class PCM(lib.StreamObject):
             q[i, :] = sol[:n]
 
         vmat = self._get_vmat(q)
-        epcm = 0.50000 * numpy.dot(q[0], v_grids[0])
+        epcm = 0.5 * numpy.dot(q[0], v_grids[0])
         vK_1 = numpy.linalg.solve(K.T, v_grids.T)
         qt = numpy.dot(R.T, vK_1).T
         q_sym = (q + qt)/2.0
 
         vmat = self._get_vmat(q_sym)
-        # eq.(15)
         epcm = 0.5 * numpy.dot(q_sym[0], v_grids[0])
 
         self._intermediates['q'] = q[0]
