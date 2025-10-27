@@ -34,7 +34,7 @@ The commands below assume that you are starting from your terminal (macOS/Linux)
 **2.1. Download the source code.**
    ```bash
    git clone https://github.com/Takuya-0606/gchsm.git
-   cd hsm
+   cd gchsm
    ```
 
 **2.2. Create and activate a dedicated Conda environment. (Recommended)**
