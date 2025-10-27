@@ -1,0 +1,53 @@
+# Copyright 2025 The GCHSM Developers. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Author: Takuya HASHIMOTO
+#
+
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gchsm"
+version = "1.0"
+description = "Gaussian charge distributed harmonic solvation model (GCHSM) driver"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [
+  {name = "GCHSM Developers"}
+]
+keywords = ["chemistry", "pyscf", "solvation", "thermochemistry"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Chemistry"
+]
+dependencies = [
+  "numpy>=1.24",
+  "tabulate>=0.9",
+  "pyscf=2.9.0"
+]
+
+[project.scripts]
+gchsm = "gchsm:run_cli"
+
+[tool.setuptools]
+include-package-data = true
+packages = ["gchsm"]
+
+[tool.setuptools.package-dir]
+gchsm = "."
