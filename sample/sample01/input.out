@@ -1,0 +1,101 @@
+**********************************************************
+
+  GGGGGGG     CCCCCCC     H     H     SSSSSSS     M     M
+  G           C           H     H     S           MM   MM
+  G           C           H     H     S           M M M M
+  G  GGGG     C           HHHHHHH     SSSSSSS     M  M  M
+  G     G     C           H     H           S     M     M
+  G     G     C           H     H           S     M     M
+  GGGGGGG     CCCCCCC     H     H     SSSSSSS     M     M
+
+  VERSION 1.0 (Oct 2025)
+
+**********************************************************
+
+Execution of GCHSM begun Mon Oct 27 17:19:38 2025
+
+----------------------------------------------------------
+comment out section
+----------------------------------------------------------
+
+------
+SYSTEM
+------
+Total number of atoms               3
+Number of electrons                10
+Charge of system                    0
+Spin multiplicity                   1
+Number of basis functions          58
+Number of occupied orbitals         5
+
+
+-----------------
+VIBRATION OPTIONS
+-----------------
+Projection of trans/rot: ON  (nTR = 6)
+
+
+---------------------
+Computational Details
+---------------------
+Method          HF
+DFT functional  -
+Basis           cc-pvtz
+Dispersion      None
+
+-----------
+PCM Details
+-----------
+SCRF (PCM)       CPCM
+Dielectric       80.1510
+vdW scale alpha  1.200
+Lebedev order    17
+
+
+*** Start vibrational frequency calculation ***
+
+--------------------
+HARMONIC FREQUENCIES
+--------------------
+
+Mode  Frequency(cm-1)  Note
+---------------------------
+   1       1.20  low
+   2       6.81  low
+   3       8.74  low
+   4     636.09  
+   5     530.85  
+   6     646.82  
+   7    1775.53  
+   8    3575.17  
+   9    3767.97  
+---------------------------
+
+-----------------------------
+Thermochemistry at 298.15 K
+-----------------------------
+
+Temperature      : 298.15  K
+Pressure         : 1.00    atm
+Total Mass       : 18.015  Amu
+
+---------------
+Internal energy
+---------------
+
+E(vib)  :      54.55 kJ/mol      13.04 kcal/mol
+E(rot)  :       6.05 kJ/mol       1.45 kcal/mol
+E(trans):       3.72 kJ/mol       0.89 kcal/mol
+Total E :      64.32 kJ/mol      15.37 kcal/mol
+
+-------
+Entropy
+-------
+
+S(vib)  :    0.00002 kJ/mol/K
+S(rot)  :    0.00566 kJ/mol/K
+S(trans):    0.12252 kJ/mol/K
+Total S :    0.12820 kJ/mol/K
+
+
+Execution of GCHSM terminated normally Mon Oct 27 17:20:20 2025
