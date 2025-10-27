@@ -44,7 +44,7 @@ The commands below assume that you are starting from your terminal (macOS/Linux)
    source .name/bin/activate          # macOS / Linux
    # .name\Scripts\Activate.ps1      # Windows PowerShell
   ```
-  This environment contains Python itself, the scientific dependencies, and the tooling required to build the Conda package locally.
+  This environment contains Python itself, the scientific dependencies, and the tooling required to build the Conda package locally. Note that `source .name/bin/activate` is bash script.
 
 **2.3. Install the package in editable mode.**
   ```bash
