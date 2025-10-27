@@ -513,11 +513,20 @@ class PCM(lib.StreamObject):
         atom_coords = mol.atom_coords(unit='B')
         atom_charges = mol.atom_charges()
 
-        int2c2e = mol._add_suffix('int2c2e')
-        fakemol = gto.fakemol_for_charges(grid_coords, expnt=charge_exp**2)
-        fakemol_nuc = gto.fakemol_for_charges(atom_coords)
-        v_ng = gto.mole.intor_cross(int2c2e, fakemol_nuc, fakemol)
-        self.v_grids_n = numpy.dot(atom_charges, v_ng)
+        #int2c2e = mol._add_suffix('int2c2e')
+        #fakemol = gto.fakemol_for_charges(grid_coords, expnt=charge_exp**2)
+        #fakemol_nuc = gto.fakemol_for_charges(atom_coords)
+        #v_ng = gto.mole.intor_cross(int2c2e, fakemol_nuc, fakemol)
+        #self.v_grids_n = numpy.dot(atom_charges, v_ng)
+        v_ng = numpy.zeros(len(grid_coords))
+        for i, ri in enumerate(grid_coords):
+            for A, (RA, ZA) in enumerate(zip(atom_coords, atom_charges)):
+                r = numpy.linalg.norm(ri - RA)
+                if r < 1e-10:
+                    continue
+                erf_term = erf(zeta[i] * r)
+                v_ng[i] += ZA * erf_term / r
+        self.v_grids_n = v_ng
 
     def _get_vind(self, dms):
         if not self._intermediates:
@@ -530,23 +539,42 @@ class PCM(lib.StreamObject):
 
         K = self._intermediates['K']
         R = self._intermediates['R']
+        # eq.(19)
         v_grids_e = self._get_v(dms)
-        v_grids = self.v_grids_n - v_grids_e
+        v_grids   = self.v_grids_n - v_grids_e
+        rhs       = numpy.dot(R, v_grids.T)
 
-        b = numpy.dot(R, v_grids.T)
-        q = numpy.linalg.solve(K, b).T
+        n = K.shape[0]
+        q = numpy.zeros_like(rhs.T)
 
+        for i in range(rhs.shape[1]):
+            A_ext = numpy.zeros((n + 1, n + 1))
+            A_ext[:n, :n] = K
+            A_ext[:n, n] = 1.0
+            A_ext[n, :n] = 1.0
+            b_ext = numpy.zeros(n + 1)
+            b_ext[:n] = rhs[:, i]
+            sol = numpy.linalg.solve(A_ext, b_ext)
+            q[i, :] = sol[:n]
+
+        vmat = self._get_vmat(q)
+        epcm = 0.50000 * numpy.dot(q[0], v_grids[0])
         vK_1 = numpy.linalg.solve(K.T, v_grids.T)
         qt = numpy.dot(R.T, vK_1).T
         q_sym = (q + qt)/2.0
 
         vmat = self._get_vmat(q_sym)
+        # eq.(15)
         epcm = 0.5 * numpy.dot(q_sym[0], v_grids[0])
 
         self._intermediates['q'] = q[0]
         self._intermediates['q_sym'] = q_sym[0]
         self._intermediates['v_grids'] = v_grids[0]
         self._intermediates['dm'] = dms
+        print('Total COSMO charge:', numpy.sum(self._intermediates['q']))
+        print('Max abs(q):', numpy.max(numpy.abs(self._intermediates['q'])))
+        print('Min abs(q):', numpy.min(numpy.abs(self._intermediates['q'])))
+        print('CPCM energy:',epcm)
         return epcm, vmat[0]
 
     def _get_v(self, dms):
@@ -594,36 +622,25 @@ class PCM(lib.StreamObject):
         return vmat
 
     def nuc_grad_method(self, grad_method):
-        raise DeprecationWarning('Use the make_grad_object function from '
-                                 'pyscf.solvent.grad.pcm or '
-                                 'pyscf.solvent._ddcosmo_tdscf_grad instead.')
-
-    def grad(self, dm):
-        '''Computes the Jacobian for the energy associated with the solvent,
-        including the derivatives of the solvent itsself and the interactions
-        between the solvent and the charge density of the solute.
-        '''
-        from pyscf.solvent.grad.pcm import grad_qv, grad_nuc, grad_solver
-        de_solvent = grad_qv(self, dm)
-        de_solvent+= grad_nuc(self, dm)
-        de_solvent+= grad_solver(self, dm)
-        return de_solvent
+        from pyscf.solvent.grad import pcm as pcm_grad
+        if self.frozen:
+            raise RuntimeError('Frozen solvent model is not supported')
+        from pyscf import scf
+        from pyscf.solvent import _ddcosmo_tdscf_grad
+        if isinstance(grad_method.base, tdscf.rhf.TDBase):
+            return _ddcosmo_tdscf_grad.make_grad_object(grad_method)
+        else:
+            return pcm_grad.make_grad_object(grad_method)
 
     def Hessian(self, hess_method):
-        raise DeprecationWarning('Use the make_hessian_object function from '
-                                 'pyscf.solvent.hessian.pcm instead.')
-
-    def hess(self, dm):
-        '''Computes the Hessian for the energy associated with the solvent,
-        including the derivatives of the solvent itsself and the interactions
-        between the solvent and the charge density of the solute.
-        '''
-        from pyscf.solvent.hessian.pcm import (
-            analytical_hess_nuc, analytical_hess_qv, analytical_hess_solver)
-        de_solvent  =    analytical_hess_nuc(self, dm, verbose=self.verbose)
-        de_solvent +=     analytical_hess_qv(self, dm, verbose=self.verbose)
-        de_solvent += analytical_hess_solver(self, dm, verbose=self.verbose)
-        return de_solvent
+        from pyscf.solvent.hessian import pcm as pcm_hess
+        if self.frozen:
+            raise RuntimeError('Frozen solvent model is not supported')
+        from pyscf import scf
+        if isinstance(hess_method.base, (scf.hf.RHF, scf.uhf.UHF)):
+            return pcm_hess.make_hess_object(hess_method)
+        else:
+            raise RuntimeError('Only SCF gradient is supported')
 
     def _B_dot_x(self, dms):
         if not self._intermediates:
