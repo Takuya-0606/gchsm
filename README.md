@@ -7,7 +7,7 @@ The source code for GC-HSM functions by connecting with [PySCF](https://github.c
 Please follow the steps below to set up your environment.
 
 # Installation
-## GCHSM ver.1.0.0 (Python package)
+## GCHSM ver.1.0 (Python package)
 
 GCHSM driver provides a workflow around [PySCF](https://pyscf.org/) for single-point, geometry
 optimisation, Hessian, and post-processing of precomputed vibrational frequency
