@@ -15,10 +15,7 @@ data. \
 The package exposes the same logic that was previously distributed as a
 collection of loose scripts, but wraps it in an installable Python package so
 that it can be invoked anywhere with a single command: `gchsm`.
-* Install GCHSM driver:
-```
-conda install -c conda-forge pyscf=2.9.0
-```
+
 ## 1. Requirements
 
 - Python **3.10** or later.
@@ -44,6 +41,7 @@ The commands below assume that you are starting from a terminal (macOS/Linux) or
   ```bash
   conda create -n gchsm python=3.10 numpy tabulate conda-build
   conda activate gchsm
+  conda install -c conda-forge pyscf=2.9.0
   ```
   This environment contains Python itself, the scientific dependencies, and the tooling required to build the Conda package locally.
 
