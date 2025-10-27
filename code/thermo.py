@@ -76,7 +76,7 @@ def harmonic_analysis(mol, hess, exclude_trans=True, exclude_rot=True,
         P = numpy.eye(natm * 3) - q.dot(q.T)
         w, v = numpy.linalg.eigh(P)
         bvec = v[:,w > LINDEP_THRESHOLD]
-        remake = reduce(numpy.dot, (bvec.T, h, bvec))
+        h = reduce(numpy.dot, (bvec.T, h, bvec))
         force_const_au, mode = numpy.linalg.eigh(h)
         mode = bvec.dot(mode)
     else:
@@ -114,6 +114,22 @@ import math
 from scipy.constants import R, k, N_A, h, c
 from tabulate import tabulate
 
+def _print_list(title, freqs):
+            print()
+            print("Vibration frequency calculation (cm^-1)")
+            print(title)
+            print("-"*40)
+            for i, f in enumerate(freqs):
+                if numpy.iscomplexobj(f) and getattr(f, 'imag', 0) != 0:
+                    tag = f"Imag"
+                    val = f"{abs(numpy.imag(f)):9.2f} i   "
+                else:
+                    tag = f"Real"
+                    val = f"{numpy.real(f):9.2f}     "
+                print(f"Mode {i+1:2d}: {val} [{tag}]")
+            print("-"*40)
+            print()
+
 def compute_tr_frequencies(hess, mass, coords):
     import numpy as np
     natm = len(mass)
@@ -139,7 +155,6 @@ def compute_tr_frequencies(hess, mass, coords):
     force_consts = np.array([v @ H_mass @ v for v in TR])
 
     # frequency
-    from pyscf.data import nist
     au2hz = (nist.HARTREE2J / (nist.ATOMIC_MASS * nist.BOHR_SI**2))**.5 / (2 * np.pi)
     freq_cm1 = np.sqrt(np.abs(force_consts)) * au2hz / nist.LIGHT_SPEED_SI * 1e-2
     _print_list("w projection of trans & rot", freq_cm1)
