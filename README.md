@@ -29,7 +29,7 @@ that it can be invoked anywhere with a single command: `gchsm`.
 
 ## 2. Installation
 
-The commands below assume that you are starting from a terminal (macOS/Linux) or PowerShell (Windows).
+The commands below assume that you are starting from your terminal (macOS/Linux) or PowerShell (Windows).
 
 **2.1. Download the source code.**
    ```bash
@@ -39,36 +39,29 @@ The commands below assume that you are starting from a terminal (macOS/Linux) or
 
 **2.2. Create and activate a dedicated Conda environment. (Recommended)**
   ```bash
-  conda create -n gchsm python=3.10 numpy tabulate conda-build
-  conda activate gchsm
-  conda install -c conda-forge pyscf=2.9.0
+   python3 -m venv .name
+   # Activate it
+   source .name/bin/activate          # macOS / Linux
+   # .name\Scripts\Activate.ps1      # Windows PowerShell
   ```
   This environment contains Python itself, the scientific dependencies, and the tooling required to build the Conda package locally.
 
-**2.3. Build the Conda package.**
+**2.3. Install the package in editable mode.**
   ```bash
-  conda build conda
+  pip install --upgrade pip
+  pip install -e .
   ```
-  Conda places the resulting package (a `.tar.bz2` file) in the directory shown at the end of the build log, typically something like
-   `~/miniconda3/conda-bld/noarch/`.
+  The installer downloads the required scientific libraries and places the `gchsm` command on your `PATH`.
 
-**2.4. Install the newly built package.**
-   ```bash
-   conda install --use-local gchsm
-   ```
+**2.4. Verify the installation.**
 
-   The `--use-local` flag tells Conda to install the package that you just
-   produced in the previous step.  After the installation finishes, the `gchsm`
-   command becomes available in the active environment.
-
-**2.5. Verify the installation.**
    ```bash
    gchsm --help
    ```
 
    The program prints a short usage message.  If the command is not found,
-   ensure that the Conda environment is active and that the installation step
-   completed without errors.
+   ensure that the virtual environment is activated and that the installation
+   step completed without errors.
 
 ## 3. Running calculation
 1. Prepare an input file that contains `%MAIN` and `%GEOMETRY` blocks.\
@@ -82,10 +75,13 @@ The commands below assume that you are starting from a terminal (macOS/Linux) or
 3. The program writes a detailed report next to the input file (for the example above, the output is `input.out`).  When `CALCTYPE=freq` is specified, the program expects a `freq.out` file in the same folder that contains tabulated vibrational frequencies; the thermochemical tables are then generated from that data.
 
 ## 4. Updating or uninstalling
-- To pick up the latest changes from this repository, update the sources (for example with `git pull`), rebuild the Conda package with `conda build conda`, and reinstall it using `conda install --use-local gchsm`.
-- To uninstall the package from the active Conda environment, run:
+- To pick up the latest changes from this repository, update the sources (for
+  example with `git pull`) and re-run `pip install -e .` inside the
+  `gchsm` directory.
+- To uninstall the package from the active Python environment, run:
+
   ```bash
-  conda remove gchsm
+  pip uninstall gchsm
   ```
 
 ## 5. Getting help
