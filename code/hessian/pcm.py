@@ -1025,6 +1025,10 @@ def make_hess_object(base_method):
 
 # Implemented by Takuya HASHIMOTO
 # PCM cavity fix algorithm based on pyscf (ver.2.8.0: nummerical hessian)
+import copy
+import numpy as np
+from pyscf.solvent.grad.pcm import grad_solver
+
 def dump_pcm_cavity_coords(pcmobj, tag=""):
     coords = pcmobj.surface['grid_coords']
     print(f"----------- {tag} (Ngrid={len(coords)}) -----------")
