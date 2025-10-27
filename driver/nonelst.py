@@ -40,13 +40,13 @@ from .nonelst_types import Site, VDW_RADII, rho_from_density
 @dataclass
 class NonElstConfig:
     enable: bool = False
-    cavity_kind: str = "pcm"
+    cavity_kind: str = "ses"
     probe_radius: float = 1.58
     npoints_per_sphere: int = 8000
     delta_A: float = 0.0
     density_g_cm3: float = 0.997
     molar_mass_g_mol: float = 18.01528
-    disp_model: str = "gamess89"
+    disp_model: str = "gamess"
     sites: List[Site] = field(default_factory=list)
     cav_model: str = "spt"
     spt_params: Dict[str, float] = field(default_factory=dict)
