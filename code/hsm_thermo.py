@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from typing import Dict, Any
+from collections.abc import Mapping
 import numpy as np
 from scipy.constants import R, k, h, c
 from tabulate import tabulate
@@ -167,11 +168,28 @@ def _E_one(v_cm1: float, T: float) -> float:
     return R * T * (t * (0.5 + e / (1.0 - e)))
 
 @dataclass
-class HSMResult:
+class HSMResult(Mapping):
     T: float
     freq: Dict[str, np.ndarray]
     S: Dict[str, float]
     E: Dict[str, float]
+
+    def __getitem__(self, key: str):
+        if key == "T":
+            return self.T
+        if key == "freq":
+            return self.freq
+        if key == "S":
+            return self.S
+        if key == "E":
+            return self.E
+        raise KeyError(key)
+
+    def __iter__(self):
+        return iter("T", "freq", "S", "E")
+
+    def __len__(self) -> int:
+        return 4
 
 def calc_hsm(tr_cm1, vib_cm1, T: float = 298.15) -> HSMResult:
     tr = np.asarray(tr_cm1).reshape(-1)
