@@ -29,6 +29,7 @@ from pyscf.dft import gen_grid
 from pyscf.data import radii
 from pyscf.solvent import ddcosmo
 from pyscf.solvent import _attach_solvent
+from scipy.special import erf
 
 @lib.with_doc(_attach_solvent._for_scf.__doc__)
 def pcm_for_scf(mf, solvent_obj=None, dm=None):
