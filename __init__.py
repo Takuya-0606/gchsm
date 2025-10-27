@@ -27,5 +27,6 @@ except metadata.PackageNotFoundError:  # pragma: no cover - local source tree
     __version__ = "1.0"
 
 def run_cli(argv: Optional[List[str]] = None) -> int:
-    """Run the command-line interface and return an exit status."""
+    if argv is None:
+        return _main()
     return _main(argv)
