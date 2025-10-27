@@ -81,7 +81,7 @@ The following program was implemented by appending to the pyscf program.
 
 2. From the same directory as the input file, run:
    ```bash
-   gchsm input.inp
+   gchsm input.inp > input.log
    ```
 
 3. The program writes a detailed report next to the input file (for the example above, the output is `input.out`).  When `CALCTYPE=freq` is specified, the program expects a `freq.out` file in the same folder that contains tabulated vibrational frequencies; the thermochemical tables are then generated from that data.
