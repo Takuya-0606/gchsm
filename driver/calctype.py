@@ -21,6 +21,7 @@ import numpy as np
 from pyscf import mp
 from pyscf.geomopt import geometric_solver
 from pyscf.hessian import thermo
+from . import hsm_thermo
 from pyscf.tools import finite_diff as fdtools
 from pyscf.solvent.hessian import pcm as pcm_hess
 
@@ -131,7 +132,7 @@ def thermo_tables_from_freqs(tr_cm1: np.ndarray, vib_cm1: np.ndarray, temps: Ite
     """Build thermochemistry tables (E,S) for each T using your thermo helpers."""
     out = []
     for T in temps:
-        t = thermo.calc_hsm(tr_cm1, vib_cm1, T=T)  # returns J/mol and J/mol/K
+        t = hsm_thermo.calc_hsm(tr_cm1, vib_cm1, T=T)  # returns J/mol and J/mol/K
         E = t["E"]; S = t["S"]
         row = {
             "T": float(T),
@@ -180,7 +181,7 @@ def thermo_from_loaded_freqs(mol, freqs_cm1: Iterable[complex], temps: Iterable[
     mass   = mol.atom_mass_list(isotope_avg=True)
     coords = mol.atom_coords(unit="Bohr")
     hess0  = np.zeros((natm, natm, 3, 3), dtype=float)
-    tr_cm1 = thermo.compute_tr_frequencies(hess0, mass, coords)  # cm^-1
+    tr_cm1 = hsm_thermo.compute_tr_frequencies(hess0, mass, coords)  # cm^-1
 
     tables = thermo_tables_from_freqs(np.asarray(tr_cm1), np.asarray(vib_cm1), temps)
 
@@ -199,10 +200,10 @@ def _harmonic_analysis_from_hessian(mf, hess: np.ndarray, *, project: bool, freq
         mf.mol, hess, imaginary_freq=True, exclude_trans=False, exclude_rot=False
     )
 
-    freqs_tr = thermo.compute_tr_frequencies(hess, mass, coords)
-    tr, vib, full, nTR = thermo.collect_freq(mass, coords, info, freqs_tr)
+    freqs_tr = hsm_thermo.compute_tr_frequencies(hess, mass, coords)
+    tr, vib, full, nTR = hsm_thermo.collect_freq(mass, coords, info, freqs_tr)
 
-    _ = thermo.show_frequencies(mass, coords, hess, info)
+    _ = hsm_thermo.show_frequencies(mass, coords, hess, info)
 
     raw_freqs = np.asarray(info["freq_wavenumber"]).ravel()
     projected_full = np.asarray(full).ravel()
