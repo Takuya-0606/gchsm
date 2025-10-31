@@ -1,5 +1,7 @@
-# Gaussian charge distributed harmonic solvation model (GC-HSM)
+
 <img width="1280" height="703" alt="image" src="https://github.com/user-attachments/assets/9ab7fa16-4095-4a13-802f-9f6dc391a8eb" />
+
+# Gaussian charge distributed harmonic solvation model (GC-HSM)
 
 2025-10-26
 * [Document](document)
