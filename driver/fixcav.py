@@ -34,21 +34,6 @@ def _filter_kwargs(fn, kwargs):
     return {k: v for k, v in kwargs.items() if k in sig.parameters}
 
 class UserCavityPCM(_pcm.PCM):
-    """
-    PCM variant with user-defined cavity centers/radii (frozen cavity).
-
-    Key points:
-      - The dummy molecule uses the *real atom species* from the input molecule,
-        while atomic coordinates are replaced by the initial cavity centers.
-      - If assign_real_atoms=True (default), gen_surface receives an element->radius
-        table. This means per-center different radii are only possible when all
-        atoms of the same element share the same radius; otherwise a ValueError is raised.
-      - If you need truly per-center radii even for identical elements, set
-        assign_real_atoms=False, which internally assigns unique pseudo charges (1..N)
-        so that each center can have its own radius.
-      - The cavity surface is frozen across reset().
-    """
-
     def __init__(
         self,
         mol: gto.Mole,
@@ -77,7 +62,6 @@ class UserCavityPCM(_pcm.PCM):
         # Whether to assign real atom species to dummy molecule (True) or use 1..N pseudo charges (False)
         self.assign_real_atoms = bool(assign_real_atoms)
 
-        # Pull-through options while remaining compatible with API variations
         _solver = kw.pop("solver", kw.pop("method", None))
         _eps    = kw.pop("eps", None)
 
@@ -92,19 +76,12 @@ class UserCavityPCM(_pcm.PCM):
         if _eps is not None:
             self.eps = _eps
 
-    # ------------------------ helpers for radii and dummy mol ------------------------
-
     def _ensure_radii_table(self):
-        """Make sure self.radii_table exists (scaled, in Bohr), consistent with PySCF."""
         if self.radii_table is None:
             # Default convention: scaled modified_Bondi table plus probe radius (Bohr)
             self.radii_table = self.vdw_scale * modified_Bondi + self.r_probe
 
     def _user_radii_vector(self, n: int) -> Optional[np.ndarray]:
-        """
-        Return user-provided radii as a per-center vector (Bohr), applying optional scaling.
-        Return None if user radii not provided.
-        """
         if self._radii_user is None:
             return None
         ru = np.asarray(self._radii_user, dtype=float)
@@ -117,13 +94,6 @@ class UserCavityPCM(_pcm.PCM):
         return ru
 
     def _build_dummy_and_rad_table_real(self, ng: int):
-        """
-        Build a dummy molecule using *real atom species* and centers as coordinates.
-        Build an element->radius table for gen_surface that matches the intended radii.
-        Constraints:
-          - If user radii vector is given, all atoms of the same element must share
-            the same radius value; otherwise raise ValueError.
-        """
         ncenters = len(self._centers)
         if ncenters != self.mol.natm:
             raise ValueError(
@@ -169,11 +139,6 @@ class UserCavityPCM(_pcm.PCM):
         return dummy, rad_table
 
     def _build_dummy_and_rad_table_unique(self, ng: int):
-        """
-        Build a dummy molecule where each center is assigned a unique pseudo charge 1..N,
-        so that gen_surface can accept truly per-center radii. Default values are taken
-        from the element-specific table for the corresponding atom.
-        """
         ncenters = len(self._centers)
         self._ensure_radii_table()
 
@@ -201,19 +166,7 @@ class UserCavityPCM(_pcm.PCM):
 
         return dummy, rad_table
 
-    # ------------------------ main build/reset ------------------------
-
     def build(self, ng: Optional[int] = None):
-        """
-        Build the PCM intermediates using a frozen cavity defined by the initial centers.
-
-        Implementation notes:
-          - If assign_real_atoms=True (default), the dummy molecule keeps the real
-            atomic species and only coordinates are replaced by the fixed centers.
-            gen_surface then uses an element->radius table.
-          - If assign_real_atoms=False, each center is given a unique pseudo charge
-            1..N so that per-center radii can vary even within the same element.
-        """
         ncenters = len(self._centers)
         if ncenters == 0:
             raise ValueError("No cavity centers provided.")
@@ -246,23 +199,12 @@ class UserCavityPCM(_pcm.PCM):
             f_eps = (eps - 1.0) / (eps + 0.5) if eps != float("inf") else 1.0
             K = S
             R = -f_eps * np.eye(K.shape[0])
-        elif mth in ["IEF-PCM", "IEFPCM"]:
-            f_eps = (eps - 1.0) / (eps + 1.0) if eps != float("inf") else 1.0
-            DA  = D * A
-            K = S - f_eps / (2.0 * PI) * (DA @ S)
-            R = -f_eps * (np.eye(K.shape[0]) - (DA) / (2.0 * PI))
-        elif mth == "SS(V)PE":
-            f_eps = (eps - 1.0) / (eps + 1.0) if eps != float("inf") else 1.0
-            DA  = D * A
-            DAS = DA @ S
-            K = S - f_eps / (4.0 * PI) * (DAS + DAS.T)
-            R = -f_eps * (np.eye(K.shape[0]) - DA / (2.0 * PI))
         else:
             raise RuntimeError(f"Unknown PCM method: {self.method}")
 
         self._intermediates.update({"S": S, "D": D, "A": A, "K": K, "R": R, "f_epsilon": f_eps})
 
-        # Nuclear potential on surface (computed from the *real* molecule)
+        # Nuclear potential on surface
         zeta = self.surface["charge_exp"]
         grid_coords = self.surface["grid_coords"]
         nuc_coords = self.mol.atom_coords(unit="B")  # Bohr
@@ -281,10 +223,6 @@ class UserCavityPCM(_pcm.PCM):
         return self
 
     def reset(self, mol: Optional[gto.Mole] = None):
-        """
-        Keep the surface (frozen cavity); reset intermediates only.
-        This allows reusing the same cavity even if the molecule changes geometry.
-        """
         if mol is not None:
             self.mol = mol
         self._intermediates = None
