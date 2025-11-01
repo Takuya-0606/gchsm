@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 import inspect
+import copy
 import numpy as np
 from typing import Sequence, Optional, Union
 from pyscf import gto
@@ -46,17 +47,21 @@ class UserCavityPCM(_pcm.PCM):
         **kw,
     ) -> None:
         # Store cavity centers internally in Bohr
-        self._centers = np.asarray(centers, float)
+        # NOTE: gto.Mole.atom_coords() returns a view of the underlying env array.
+        # If we stored it via np.asarray we would keep sharing the same buffer,
+        # meaning subsequent geometry updates (e.g. during finite differences)
+        # would silently modify our cached cavity centers.  Use np.array(..., copy=True)
+        # to detach from the molecule coordinates and keep the cavity fixed.
+        self._centers = np.array(centers, dtype=float, copy=True)
         self._radii_user: Optional[np.ndarray] = None
         if unit.lower().startswith("a"):
             # Convert Angstrom -> Bohr
             self._centers /= BOHR
             if radii is not None:
-                self._radii_user = np.asarray(radii, float) / BOHR
+                self._radii_user = np.array(radii, dtype=float, copy=True) / BOHR
         else:
             if radii is not None:
-                self._radii_user = np.asarray(radii, float)
-
+                self._radii_user = np.array(radii, dtype=float, copy=True)
         # Whether to apply (vdw_scale * r + r_probe) to user-specified radii
         self.apply_scale_to_user = bool(apply_scale_to_user)
         # Whether to assign real atom species to dummy molecule (True) or use 1..N pseudo charges (False)
@@ -131,7 +136,10 @@ class UserCavityPCM(_pcm.PCM):
         dummy.unit = "Bohr"
         dummy.atom = [(self.mol.atom_symbol(i), coord.tolist())
                       for i, coord in enumerate(self._centers)]
-        dummy.basis = {}
+        if self.mol.basis is not None:
+            dummy.basis = copy.deepcopy(self.mol.basis)
+        else:
+            dummy.basis = {}
         dummy.charge = 0
         dummy.spin = 0
         dummy.build(unit="Bohr", verbose=0)
@@ -159,7 +167,10 @@ class UserCavityPCM(_pcm.PCM):
         dummy = gto.Mole()
         dummy.unit = "Bohr"
         dummy.atom = [((i + 1), coord.tolist()) for i, coord in enumerate(self._centers)]
-        dummy.basis = {}
+        if self.mol.basis is not None:
+            dummy.basis = copy.deepcopy(self.mol.basis)
+        else:
+            dummy.basis = {}
         dummy.charge = 0
         dummy.spin = 0
         dummy.build(unit="Bohr", verbose=0)
