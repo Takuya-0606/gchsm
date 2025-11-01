@@ -1,5 +1,5 @@
 
-<img width="1254" height="615" alt="image" src="https://github.com/user-attachments/assets/3001ccef-c73a-41b4-8bec-c56841837185" />
+<img width="600" height="615" alt="image" src="https://github.com/user-attachments/assets/3001ccef-c73a-41b4-8bec-c56841837185" />
 
 # Gaussian charge distributed harmonic solvation model (GC-HSM)
 
