@@ -23,7 +23,7 @@ def _load_user_cavity_pcm():
     """Import UserCavityPCM from driver.fixcav and return the class or None."""
     try:
         # IMPORTANT: path must be project-root + 'driver'; __init__.py required
-        from driver.fixcav import UserCavityPCM  # type: ignore
+        from .fixcav import UserCavityPCM
         return UserCavityPCM
     except Exception as e:
         print(f"[warn] UserCavityPCM not available (driver/fixcav.py). Reason: {type(e).__name__}: {e}")
