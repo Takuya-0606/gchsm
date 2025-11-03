@@ -157,7 +157,7 @@ def compute_tr_frequencies(hess, mass, coords):
     # frequency
     au2hz = (nist.HARTREE2J / (nist.ATOMIC_MASS * nist.BOHR_SI**2))**.5 / (2 * np.pi)
     freq_cm1 = np.sqrt(np.abs(force_consts)) * au2hz / nist.LIGHT_SPEED_SI * 1e-2
-    _print_list("w projection of trans & rot", freq_cm1)
+    #_print_list("w projection of trans & rot", freq_cm1)
     return freq_cm1
 
 def collect_freq(mass, atom_coords, results, freqs_tr_cm1):
