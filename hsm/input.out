@@ -1,0 +1,1910 @@
+#INFO: **** input file is /home/hashimoto/04_package/gchsm/hsm/testE.py ****
+from pyscf import gto, scf, mp
+from pyscf.hessian import thermo
+from pyscf.tools.finite_diff import Hessian as FDHessian
+import numpy as np
+from hsm import fixcav
+
+def main():
+    mol = gto.M(
+        atom='''
+O   0.00000000000000  0.00000000000000  0.14989271676966
+H   0.00000000000000  0.75233197920560 -0.44864635838483
+H   0.00000000000000 -0.75233197920560 -0.44864635838484
+''',
+        basis='cc-pvtz',
+        unit='Angstrom',
+        verbose=4
+    )
+
+    pcm = fixcav(
+        mol,
+        centers=mol.atom_coords(unit="Angstrom"),
+        radii=1.2,
+        method="C-PCM",
+        eps=80.1510
+    )
+    pcm.lebedev_order = 17
+    pcm.build()
+
+    mf = pcm.attach_to(scf.RHF(mol), build_surface=False)
+    mf.conv_tol = 1e-10
+    mf.conv_tol_grad = 1e-6
+    print("Running RHF + PCM (frozen cavity) ...")
+    mf.kernel()
+
+    mymp2 = mp.MP2(mf)
+    mymp2.conv_tol = 1e-10
+    print("Running MP2 on PCM-reference ...")
+    mymp2.kernel()
+
+    grad = mymp2.nuc_grad_method()
+    grad.verbose = 4
+
+    g0 = grad.kernel()
+    print("||Grad(HF+PCM)|| =", float(np.linalg.norm(g0)))
+
+    h_step = 5.0e-3
+    fdh = FDHessian(grad)
+    fdh.displacement = h_step
+
+    print("Building Hessian via finite-difference of analytic gradients (HF+PCM, frozen cavity) ...")
+    H = fdh.kernel()
+
+    mass   = mol.atom_mass_list(isotope_avg=True)
+    coords = mol.atom_coords(unit='Bohr')
+
+    freq_info = thermo.harmonic_analysis(
+        mol, H,
+        imaginary_freq=True,
+        exclude_trans=False,
+        exclude_rot=False,
+    )
+    freqs_tr = thermo.compute_tr_frequencies(H, mass, coords)
+    tr, vib, full, nTR = thermo.collect_freq(mass, coords, freq_info, freqs_tr)
+
+    res = thermo.calc_hsm(tr, vib, T=298.15)
+    thermo.print_hsm_tables(res)
+
+if __name__ == "__main__":
+    main()
+
+#INFO: ******************** input file end ********************
+
+
+System: uname_result(system='Linux', node='nakailab63-gpu', release='6.14.0-28-generic', version='#28~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Jul 25 10:47:01 UTC 2', machine='x86_64')  Threads 28
+Python 3.12.9 | packaged by Anaconda, Inc. | (main, Feb  6 2025, 18:56:27) [GCC 11.2.0]
+numpy 2.3.4  scipy 1.16.3  h5py 3.15.1
+Date: Mon Nov  3 16:32:34 2025
+PySCF version 2.9.0
+PySCF path  /home/hashimoto/04_package/gchsm/.name/lib/python3.12/site-packages/pyscf
+
+[CONFIG] conf_file None
+[INPUT] verbose = 4
+[INPUT] num. atoms = 3
+[INPUT] num. electrons = 10
+[INPUT] charge = 0
+[INPUT] spin (= nelec alpha-beta = 2S) = 0
+[INPUT] symmetry False subgroup None
+[INPUT] Mole.unit = Angstrom
+[INPUT] Symbol           X                Y                Z      unit          X                Y                Z       unit  Magmom
+[INPUT]  1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr   0.0
+[INPUT]  2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr   0.0
+[INPUT]  3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr   0.0
+
+nuclear repulsion = 9.15864705164347
+number of shells = 21
+number of NR pGTOs = 74
+number of NR cGTOs = 58
+basis = cc-pvtz
+ecp = {}
+CPU time:         5.29
+surface area: 164.8639700429689
+Running RHF + PCM (frozen cavity) ...
+
+
+******** <class 'pyscf.solvent._attach_solvent.PCMRHF'> ********
+method = PCMRHF
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 110 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+Initial guess from minao.
+<class 'hsm.fixcav'> E_diel = -0.000111108320422205
+Solvent Energy = -0.000111108320422205
+init E= -75.8730114456482
+  HOMO = -0.474533824596551  LUMO = 0.0807309326168732
+<class 'hsm.fixcav'> E_diel = -0.0171586648276996
+Solvent Energy = -0.0171586648276996
+cycle= 1 E= -76.0362982722598  delta_E= -0.163  |g|= 0.415  |ddm|=    1
+  HOMO = -0.436949255186806  LUMO = 0.16104438409633
+<class 'hsm.fixcav'> E_diel = -0.0103639947058127
+Solvent Energy = -0.0103639947058127
+cycle= 2 E= -76.0591863368622  delta_E= -0.0229  |g|= 0.231  |ddm|= 0.271
+  HOMO = -0.511475526225895  LUMO = 0.153658953922893
+<class 'hsm.fixcav'> E_diel = -0.0118256961737885
+Solvent Energy = -0.0118256961737885
+cycle= 3 E= -76.0670197632241  delta_E= -0.00783  |g|= 0.0229  |ddm|= 0.0897
+  HOMO = -0.505166906445445  LUMO = 0.155998249957458
+<class 'hsm.fixcav'> E_diel = -0.0117792545054832
+Solvent Energy = -0.0117792545054832
+cycle= 4 E= -76.067148548201  delta_E= -0.000129  |g|= 0.00498  |ddm|= 0.0174
+  HOMO = -0.505622377042104  LUMO = 0.156060818407145
+<class 'hsm.fixcav'> E_diel = -0.0117845019919514
+Solvent Energy = -0.0117845019919514
+cycle= 5 E= -76.0671600839868  delta_E= -1.15e-05  |g|= 0.00101  |ddm|= 0.00654
+  HOMO = -0.50566676436464  LUMO = 0.15604877395966
+<class 'hsm.fixcav'> E_diel = -0.0117884668266959
+Solvent Energy = -0.0117884668266959
+cycle= 6 E= -76.0671607136259  delta_E= -6.3e-07  |g|= 0.0002  |ddm|= 0.00137
+  HOMO = -0.505710235035734  LUMO = 0.156039189352817
+<class 'hsm.fixcav'> E_diel = -0.0117889755301247
+Solvent Energy = -0.0117889755301247
+cycle= 7 E= -76.0671607395581  delta_E= -2.59e-08  |g|= 3.12e-05  |ddm|= 0.000288
+  HOMO = -0.50570801792943  LUMO = 0.15603870677083
+<class 'hsm.fixcav'> E_diel = -0.0117889299032805
+Solvent Energy = -0.0117889299032805
+cycle= 8 E= -76.067160740099  delta_E= -5.41e-10  |g|= 3.29e-06  |ddm|= 4.84e-05
+  HOMO = -0.505707138326078  LUMO = 0.156038922635121
+<class 'hsm.fixcav'> E_diel = -0.0117889680749653
+Solvent Energy = -0.0117889680749653
+cycle= 9 E= -76.0671607401055  delta_E= -6.57e-12  |g|= 8.62e-07  |ddm|= 4.99e-06
+  HOMO = -0.505707031560424  LUMO = 0.156038914023172
+<class 'hsm.fixcav'> E_diel = -0.0117889854781982
+Solvent Energy = -0.0117889854781982
+Extra cycle  E= -76.0671607401061  delta_E= -5.83e-13  |g|= 3.99e-07  |ddm|= 8.76e-07
+converged SCF energy = -76.0671607401061
+Running MP2 on PCM-reference ...
+
+******** <class 'pyscf.mp.mp2.MP2'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 135 MB)
+E(MP2) = -76.3419041566706  E_corr = -0.274743416564498
+E(SCS-MP2) = -76.3391355067114  E_corr = -0.271974766605246
+E_corr(same-spin) = -0.0665969230063292
+E_corr(oppo-spin) = -0.208146493558169
+<class 'hsm.fixcav'> E_diel = -7.05884006608241
+<class 'hsm.fixcav'> E_diel = -7.0590027332941
+<class 'hsm.fixcav'> E_diel = -7.05806863711111
+<class 'hsm.fixcav'> E_diel = -7.05804633990557
+<class 'hsm.fixcav'> E_diel = -7.05819771495317
+<class 'hsm.fixcav'> E_diel = -7.05817102340373
+<class 'hsm.fixcav'> E_diel = -7.05817023941075
+<class 'hsm.fixcav'> E_diel = -7.05817033618093
+<class 'hsm.fixcav'> E_diel = -7.06142328762045
+--------------- MP2 gradients ---------------
+         x                y                z
+0 O     0.0000000000     0.0000000000     0.0151833271
+1 H    -0.0000000000     0.0053232039    -0.0075916636
+2 H    -0.0000000000    -0.0053232039    -0.0075916636
+----------------------------------------------
+||Grad(HF+PCM)|| = 0.02006173309394952
+Building Hessian via finite-difference of analytic gradients (HF+PCM, frozen cavity) ...
+Computing finite-difference Hessian for {method}
+Apply {method}.scanner
+Create scanner for <class 'pyscf.grad.mp2.Gradients'>
+Set <class 'pyscf.mp.mp2.MP2'> as a scanner
+Create scanner for <class 'pyscf.solvent._attach_solvent.PCMRHF'>
+New geometry
+   1 O      0.002645886055   0.000000000000   0.149892716770 AA    0.005000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 152 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117891781191762
+Solvent Energy = -0.0117891781191762
+init E= -76.0671510300137
+  HOMO = -0.50570612982467  LUMO = 0.156036525118916
+<class 'hsm.fixcav'> E_diel = -0.0117892316774125
+Solvent Energy = -0.0117892316774125
+cycle= 1 E= -76.0671603230108  delta_E= -9.29e-06  |g|= 0.000687  |ddm|= 0.00233
+  HOMO = -0.505704981686761  LUMO = 0.156038720381251
+<class 'hsm.fixcav'> E_diel = -0.0117891524055077
+Solvent Energy = -0.0117891524055077
+cycle= 2 E= -76.0671604670989  delta_E= -1.44e-07  |g|= 0.000217  |ddm|= 0.000693
+  HOMO = -0.505708980107252  LUMO = 0.15603819360458
+<class 'hsm.fixcav'> E_diel = -0.0117892021966145
+Solvent Energy = -0.0117892021966145
+cycle= 3 E= -76.0671604971753  delta_E= -3.01e-08  |g|= 6.64e-05  |ddm|= 0.000373
+  HOMO = -0.505705239864291  LUMO = 0.156038691695354
+<class 'hsm.fixcav'> E_diel = -0.0117891306854707
+Solvent Energy = -0.0117891306854707
+cycle= 4 E= -76.0671605006433  delta_E= -3.47e-09  |g|= 1.54e-05  |ddm|= 0.000123
+  HOMO = -0.505708627905756  LUMO = 0.156038258778425
+<class 'hsm.fixcav'> E_diel = -0.0117891888186865
+Solvent Energy = -0.0117891888186865
+cycle= 5 E= -76.0671605008473  delta_E= -2.04e-10  |g|= 5.61e-06  |ddm|= 2.73e-05
+  HOMO = -0.505706865467745  LUMO = 0.156038484852374
+<class 'hsm.fixcav'> E_diel = -0.0117891577090154
+Solvent Energy = -0.0117891577090154
+cycle= 6 E= -76.067160500857  delta_E= -9.78e-12  |g|= 1.1e-06  |ddm|= 5.36e-06
+  HOMO = -0.505707055347319  LUMO = 0.156038460517609
+<class 'hsm.fixcav'> E_diel = -0.0117891610829291
+Solvent Energy = -0.0117891610829291
+cycle= 7 E= -76.067160500858  delta_E= -9.95e-13  |g|= 1.19e-07  |ddm|= 2.51e-06
+  HOMO = -0.505707048769991  LUMO = 0.156038461310058
+<class 'hsm.fixcav'> E_diel = -0.0117891610071961
+Solvent Energy = -0.0117891610071961
+Extra cycle  E= -76.0671605008586  delta_E= -5.4e-13  |g|= 4.04e-08  |ddm|= 1.75e-07
+converged SCF energy = -76.0671605008586
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 172 MB)
+E(MP2_Scanner) = -76.3419041921652  E_corr = -0.274743691306686
+E(SCS-MP2_Scanner) = -76.3391355387524  E_corr = -0.271975037893861
+E_corr(same-spin) = -0.0665969903932634
+E_corr(oppo-spin) = -0.208146700913422
+<class 'hsm.fixcav'> E_diel = -7.05886033711533
+<class 'hsm.fixcav'> E_diel = -7.05902303998476
+<class 'hsm.fixcav'> E_diel = -7.05808882917087
+<class 'hsm.fixcav'> E_diel = -7.0580665178017
+<class 'hsm.fixcav'> E_diel = -7.05821791201928
+<class 'hsm.fixcav'> E_diel = -7.05819122156363
+<class 'hsm.fixcav'> E_diel = -7.05819043788748
+<class 'hsm.fixcav'> E_diel = -7.05819053467259
+<class 'hsm.fixcav'> E_diel = -7.06144386778948
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O     0.0000676320     0.0000000000     0.0151885298
+1 H    -0.0000338160     0.0053254514    -0.0075942649
+2 H    -0.0000338160    -0.0053254514    -0.0075942649
+----------------------------------------------
+New geometry
+   1 O     -0.002645886055   0.000000000000   0.149892716770 AA   -0.005000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 175 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117890564847074
+Solvent Energy = -0.0117890564847074
+init E= -76.0671406476981
+  HOMO = -0.505700674940054  LUMO = 0.156032533175902
+<class 'hsm.fixcav'> E_diel = -0.0117894239856513
+Solvent Energy = -0.0117894239856513
+cycle= 1 E= -76.0671597893991  delta_E= -1.91e-05  |g|= 0.00137  |ddm|= 0.00467
+  HOMO = -0.505700175548939  LUMO = 0.156039224638801
+<class 'hsm.fixcav'> E_diel = -0.0117891121920835
+Solvent Energy = -0.0117891121920835
+cycle= 2 E= -76.0671603657943  delta_E= -5.76e-07  |g|= 0.000434  |ddm|= 0.00139
+  HOMO = -0.505713630356287  LUMO = 0.156037574626188
+<class 'hsm.fixcav'> E_diel = -0.0117892953606906
+Solvent Energy = -0.0117892953606906
+cycle= 3 E= -76.0671604860491  delta_E= -1.2e-07  |g|= 0.000134  |ddm|= 0.000747
+  HOMO = -0.505701062605166  LUMO = 0.156039229116857
+<class 'hsm.fixcav'> E_diel = -0.0117890589959401
+Solvent Energy = -0.0117890589959401
+cycle= 4 E= -76.06716049989  delta_E= -1.38e-08  |g|= 3.53e-05  |ddm|= 0.000243
+  HOMO = -0.505710953840384  LUMO = 0.156037961742917
+<class 'hsm.fixcav'> E_diel = -0.0117892298995229
+Solvent Energy = -0.0117892298995229
+cycle= 5 E= -76.0671605007835  delta_E= -8.94e-10  |g|= 1.42e-05  |ddm|= 5.38e-05
+  HOMO = -0.505706817412306  LUMO = 0.156038491270775
+<class 'hsm.fixcav'> E_diel = -0.0117891567281127
+Solvent Energy = -0.0117891567281127
+cycle= 6 E= -76.0671605008552  delta_E= -7.17e-11  |g|= 2.1e-06  |ddm|= 1.5e-05
+  HOMO = -0.50570705821047  LUMO = 0.156038460309714
+<class 'hsm.fixcav'> E_diel = -0.0117891610146031
+Solvent Energy = -0.0117891610146031
+cycle= 7 E= -76.0671605008577  delta_E= -2.44e-12  |g|= 2.37e-07  |ddm|= 5.27e-06
+  HOMO = -0.50570704825271  LUMO = 0.156038461435248
+<class 'hsm.fixcav'> E_diel = -0.011789160947691
+Solvent Energy = -0.011789160947691
+Extra cycle  E= -76.0671605008581  delta_E= -3.69e-13  |g|= 8.02e-08  |ddm|= 3.5e-07
+converged SCF energy = -76.0671605008581
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 178 MB)
+E(MP2_Scanner) = -76.3419041921492  E_corr = -0.274743691291194
+E(SCS-MP2_Scanner) = -76.3391355387428  E_corr = -0.271975037884742
+E_corr(same-spin) = -0.0665969903823352
+E_corr(oppo-spin) = -0.208146700908858
+<class 'hsm.fixcav'> E_diel = -7.05886033711627
+<class 'hsm.fixcav'> E_diel = -7.05902303998438
+<class 'hsm.fixcav'> E_diel = -7.05808882917112
+<class 'hsm.fixcav'> E_diel = -7.05806651780075
+<class 'hsm.fixcav'> E_diel = -7.05821791201947
+<class 'hsm.fixcav'> E_diel = -7.05819122156363
+<class 'hsm.fixcav'> E_diel = -7.05819043788748
+<class 'hsm.fixcav'> E_diel = -7.05819053467259
+<class 'hsm.fixcav'> E_diel = -7.06144386778833
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000676347     0.0000000000     0.0151885296
+1 H     0.0000338174     0.0053254514    -0.0075942648
+2 H     0.0000338174    -0.0053254514    -0.0075942648
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.002645886055   0.149892716770 AA    0.000000000000   0.005000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 179 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117892820638485
+Solvent Energy = -0.0117892820638485
+init E= -76.0671520864532
+  HOMO = -0.505708721111123  LUMO = 0.156034630297006
+<class 'hsm.fixcav'> E_diel = -0.0117891677670115
+Solvent Energy = -0.0117891677670115
+cycle= 1 E= -76.067151824735  delta_E= 2.62e-07  |g|= 0.00125  |ddm|= 0.00316
+  HOMO = -0.505704687521755  LUMO = 0.156037631191917
+<class 'hsm.fixcav'> E_diel = -0.0117891004445869
+Solvent Energy = -0.0117891004445869
+cycle= 2 E= -76.0671522430143  delta_E= -4.18e-07  |g|= 0.000329  |ddm|= 0.000976
+  HOMO = -0.505708708309327  LUMO = 0.156036948470384
+<class 'hsm.fixcav'> E_diel = -0.0117891616995508
+Solvent Energy = -0.0117891616995508
+cycle= 3 E= -76.067152287713  delta_E= -4.47e-08  |g|= 0.000117  |ddm|= 0.00034
+  HOMO = -0.505705851743054  LUMO = 0.15603733649943
+<class 'hsm.fixcav'> E_diel = -0.0117891063964292
+Solvent Energy = -0.0117891063964292
+cycle= 4 E= -76.0671522973682  delta_E= -9.66e-09  |g|= 2.85e-05  |ddm|= 0.000196
+  HOMO = -0.505709000877134  LUMO = 0.156036940240743
+<class 'hsm.fixcav'> E_diel = -0.0117891587627724
+Solvent Energy = -0.0117891587627724
+cycle= 5 E= -76.0671522980727  delta_E= -7.05e-10  |g|= 7.64e-06  |ddm|= 5.13e-05
+  HOMO = -0.505706585618461  LUMO = 0.156037250659407
+<class 'hsm.fixcav'> E_diel = -0.011789115661431
+Solvent Energy = -0.011789115661431
+cycle= 6 E= -76.0671522981015  delta_E= -2.88e-11  |g|= 3.03e-06  |ddm|= 8.77e-06
+  HOMO = -0.505707334625654  LUMO = 0.1560371546509
+<class 'hsm.fixcav'> E_diel = -0.0117891285638834
+Solvent Energy = -0.0117891285638834
+cycle= 7 E= -76.0671522981059  delta_E= -4.45e-12  |g|= 5.34e-07  |ddm|= 4.03e-06
+  HOMO = -0.505707289212552  LUMO = 0.156037160408704
+<class 'hsm.fixcav'> E_diel = -0.0117891277697126
+Solvent Energy = -0.0117891277697126
+Extra cycle  E= -76.0671522981057  delta_E= 1.99e-13  |g|= 2.27e-07  |ddm|= 5e-07
+converged SCF energy = -76.0671522981057
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 181 MB)
+E(MP2_Scanner) = -76.3418958003058  E_corr = -0.274743502200056
+E(SCS-MP2_Scanner) = -76.339127179497  E_corr = -0.271974881391293
+E_corr(same-spin) = -0.0665969091332014
+E_corr(oppo-spin) = -0.208146593066855
+<class 'hsm.fixcav'> E_diel = -7.05885636243211
+<class 'hsm.fixcav'> E_diel = -7.05901904200912
+<class 'hsm.fixcav'> E_diel = -7.05808485728825
+<class 'hsm.fixcav'> E_diel = -7.05806248607599
+<class 'hsm.fixcav'> E_diel = -7.05821390964039
+<class 'hsm.fixcav'> E_diel = -7.05818721975538
+<class 'hsm.fixcav'> E_diel = -7.05818643696031
+<class 'hsm.fixcav'> E_diel = -7.05818653381817
+<class 'hsm.fixcav'> E_diel = -7.0614398090198
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O     0.0000000363     0.0034113750     0.0151611414
+1 H    -0.0000000170     0.0036088474    -0.0062398504
+2 H    -0.0000000193    -0.0070202224    -0.0089212910
+----------------------------------------------
+New geometry
+   1 O      0.000000000000  -0.002645886055   0.149892716770 AA    0.000000000000  -0.005000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 181 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117898498755886
+Solvent Energy = -0.0117898498755886
+init E= -76.0671571136017
+  HOMO = -0.505716337836592  LUMO = 0.156033668089402
+<class 'hsm.fixcav'> E_diel = -0.0117890398164334
+Solvent Energy = -0.0117890398164334
+cycle= 1 E= -76.0671511159129  delta_E= 6e-06  |g|= 0.00209  |ddm|= 0.00426
+  HOMO = -0.505704176691136  LUMO = 0.15603799296427
+<class 'hsm.fixcav'> E_diel = -0.0117890847951014
+Solvent Energy = -0.0117890847951014
+cycle= 2 E= -76.0671522127588  delta_E= -1.1e-06  |g|= 0.000494  |ddm|= 0.00137
+  HOMO = -0.505708751735436  LUMO = 0.156036975324874
+<class 'hsm.fixcav'> E_diel = -0.0117891579512826
+Solvent Energy = -0.0117891579512826
+cycle= 3 E= -76.0671522845469  delta_E= -7.18e-08  |g|= 0.000144  |ddm|= 0.000332
+  HOMO = -0.505705764283025  LUMO = 0.156037342281106
+<class 'hsm.fixcav'> E_diel = -0.0117891063117471
+Solvent Energy = -0.0117891063117471
+cycle= 4 E= -76.0671522975213  delta_E= -1.3e-08  |g|= 2.87e-05  |ddm|= 0.000193
+  HOMO = -0.505708883325874  LUMO = 0.156036952422772
+<class 'hsm.fixcav'> E_diel = -0.0117891580671703
+Solvent Energy = -0.0117891580671703
+cycle= 5 E= -76.0671522980847  delta_E= -5.63e-10  |g|= 7.2e-06  |ddm|= 3.68e-05
+  HOMO = -0.505706492199205  LUMO = 0.156037261414887
+<class 'hsm.fixcav'> E_diel = -0.0117891147695462
+Solvent Energy = -0.0117891147695462
+cycle= 6 E= -76.0671522981028  delta_E= -1.8e-11  |g|= 3.08e-06  |ddm|= 6.44e-06
+  HOMO = -0.505707326280637  LUMO = 0.15603715541365
+<class 'hsm.fixcav'> E_diel = -0.0117891287449081
+Solvent Energy = -0.0117891287449081
+cycle= 7 E= -76.067152298106  delta_E= -3.23e-12  |g|= 4.7e-07  |ddm|= 3.05e-06
+  HOMO = -0.505707292086275  LUMO = 0.156037159902067
+<class 'hsm.fixcav'> E_diel = -0.0117891279796093
+Solvent Energy = -0.0117891279796093
+Extra cycle  E= -76.0671522981059  delta_E= 8.53e-14  |g|= 2e-07  |ddm|= 6.1e-07
+converged SCF energy = -76.0671522981059
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 183 MB)
+E(MP2_Scanner) = -76.3418958004312  E_corr = -0.274743502325253
+E(SCS-MP2_Scanner) = -76.3391271795836  E_corr = -0.271974881477689
+E_corr(same-spin) = -0.0665969092068621
+E_corr(oppo-spin) = -0.20814659311839
+<class 'hsm.fixcav'> E_diel = -7.05885636242766
+<class 'hsm.fixcav'> E_diel = -7.05901904202677
+<class 'hsm.fixcav'> E_diel = -7.05808485728445
+<class 'hsm.fixcav'> E_diel = -7.0580624860876
+<class 'hsm.fixcav'> E_diel = -7.05821390963986
+<class 'hsm.fixcav'> E_diel = -7.0581872197553
+<class 'hsm.fixcav'> E_diel = -7.05818643696032
+<class 'hsm.fixcav'> E_diel = -7.05818653381817
+<class 'hsm.fixcav'> E_diel = -7.06143980908136
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O     0.0000000000    -0.0034114064     0.0151611407
+1 H    -0.0000000000     0.0070202378    -0.0089213177
+2 H    -0.0000000000    -0.0036088314    -0.0062398231
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.152538602824 AA    0.000000000000   0.000000000000   0.288256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 182 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0118684035116625
+Solvent Energy = -0.0118684035116625
+init E= -76.0648599070065
+  HOMO = -0.506034515408622  LUMO = 0.155594703692402
+<class 'hsm.fixcav'> E_diel = -0.0118419423001708
+Solvent Energy = -0.0118419423001708
+cycle= 1 E= -76.0670253560467  delta_E= -0.00217  |g|= 0.00147  |ddm|= 0.00296
+  HOMO = -0.505450518627009  LUMO = 0.155897066121213
+<class 'hsm.fixcav'> E_diel = -0.011837781966048
+Solvent Energy = -0.011837781966048
+cycle= 2 E= -76.0670259125075  delta_E= -5.56e-07  |g|= 0.000601  |ddm|= 0.00102
+  HOMO = -0.505693231999231  LUMO = 0.155856400296264
+<class 'hsm.fixcav'> E_diel = -0.0118389384063624
+Solvent Energy = -0.0118389384063624
+cycle= 3 E= -76.0670259784723  delta_E= -6.6e-08  |g|= 0.000198  |ddm|= 0.000326
+  HOMO = -0.50565569230695  LUMO = 0.155858712883536
+<class 'hsm.fixcav'> E_diel = -0.0118362655984017
+Solvent Energy = -0.0118362655984017
+cycle= 4 E= -76.06702599247  delta_E= -1.4e-08  |g|= 6.18e-05  |ddm|= 0.000158
+  HOMO = -0.505672540755419  LUMO = 0.155857279210832
+<class 'hsm.fixcav'> E_diel = -0.0118354848788039
+Solvent Energy = -0.0118354848788039
+cycle= 5 E= -76.0670259945965  delta_E= -2.13e-09  |g|= 1.33e-05  |ddm|= 7.99e-05
+  HOMO = -0.505672703974105  LUMO = 0.155857837128876
+<class 'hsm.fixcav'> E_diel = -0.0118351058795569
+Solvent Energy = -0.0118351058795569
+cycle= 6 E= -76.0670259947264  delta_E= -1.3e-10  |g|= 2.2e-06  |ddm|= 2.24e-05
+  HOMO = -0.505673215486452  LUMO = 0.155857861597932
+<class 'hsm.fixcav'> E_diel = -0.0118350639735852
+Solvent Energy = -0.0118350639735852
+cycle= 7 E= -76.0670259947294  delta_E= -2.93e-12  |g|= 3.15e-07  |ddm|= 3.62e-06
+  HOMO = -0.505673226955325  LUMO = 0.15585786514878
+<class 'hsm.fixcav'> E_diel = -0.0118350632738614
+Solvent Energy = -0.0118350632738614
+Extra cycle  E= -76.0670259947297  delta_E= -2.84e-13  |g|= 1.26e-07  |ddm|= 3.71e-07
+converged SCF energy = -76.0670259947297
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 183 MB)
+E(MP2_Scanner) = -76.3418958740667  E_corr = -0.274869879337059
+E(SCS-MP2_Scanner) = -76.3391260742334  E_corr = -0.272100079503722
+E_corr(same-spin) = -0.0666274335008637
+E_corr(oppo-spin) = -0.208242445836195
+<class 'hsm.fixcav'> E_diel = -7.05830489368654
+<class 'hsm.fixcav'> E_diel = -7.0584756066165
+<class 'hsm.fixcav'> E_diel = -7.05752137522917
+<class 'hsm.fixcav'> E_diel = -7.05749623219962
+<class 'hsm.fixcav'> E_diel = -7.05765128333101
+<class 'hsm.fixcav'> E_diel = -7.05762469360812
+<class 'hsm.fixcav'> E_diel = -7.05762396805317
+<class 'hsm.fixcav'> E_diel = -7.05762407023316
+<class 'hsm.fixcav'> E_diel = -7.06094118483409
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O     0.0000000000    -0.0000000200     0.0175588079
+1 H    -0.0000000000     0.0063322720    -0.0087793978
+2 H    -0.0000000000    -0.0063322520    -0.0087794101
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.147246830715 AA    0.000000000000   0.000000000000   0.278256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 185 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0116781207353968
+Solvent Energy = -0.0116781207353968
+init E= -76.0716049011506
+  HOMO = -0.505038094738103  LUMO = 0.156736244788514
+<class 'hsm.fixcav'> E_diel = -0.0117296409014731
+Solvent Energy = -0.0117296409014731
+cycle= 1 E= -76.0672817195984  delta_E= 0.00432  |g|= 0.00204  |ddm|= 0.00413
+  HOMO = -0.506177637083783  LUMO = 0.156141745871176
+<class 'hsm.fixcav'> E_diel = -0.011737515464586
+Solvent Energy = -0.011737515464586
+cycle= 2 E= -76.0672828318663  delta_E= -1.11e-06  |g|= 0.00107  |ddm|= 0.0015
+  HOMO = -0.505754076643474  LUMO = 0.156212593372617
+<class 'hsm.fixcav'> E_diel = -0.0117357116604803
+Solvent Energy = -0.0117357116604803
+cycle= 3 E= -76.0672830251744  delta_E= -1.93e-07  |g|= 0.000275  |ddm|= 0.000515
+  HOMO = -0.505760235717315  LUMO = 0.156219441171223
+<class 'hsm.fixcav'> E_diel = -0.0117406697946612
+Solvent Energy = -0.0117406697946612
+cycle= 4 E= -76.067283062013  delta_E= -3.68e-08  |g|= 8.14e-05  |ddm|= 0.000289
+  HOMO = -0.505742379963335  LUMO = 0.156219464000908
+<class 'hsm.fixcav'> E_diel = -0.0117424077582204
+Solvent Energy = -0.0117424077582204
+cycle= 5 E= -76.0672830667578  delta_E= -4.74e-09  |g|= 1.92e-05  |ddm|= 0.000128
+  HOMO = -0.505741684074907  LUMO = 0.156218588289276
+<class 'hsm.fixcav'> E_diel = -0.0117430626934253
+Solvent Energy = -0.0117430626934253
+cycle= 6 E= -76.0672830670314  delta_E= -2.74e-10  |g|= 2.75e-06  |ddm|= 3.54e-05
+  HOMO = -0.505740959689922  LUMO = 0.156218526918019
+<class 'hsm.fixcav'> E_diel = -0.0117431043721353
+Solvent Energy = -0.0117431043721353
+cycle= 7 E= -76.0672830670349  delta_E= -3.52e-12  |g|= 2.22e-07  |ddm|= 4.11e-06
+  HOMO = -0.505740967128742  LUMO = 0.156218524757964
+<class 'hsm.fixcav'> E_diel = -0.0117431020326587
+Solvent Energy = -0.0117431020326587
+Extra cycle  E= -76.0672830670349  delta_E= -5.68e-14  |g|= 7.83e-08  |ddm|= 4.15e-07
+converged SCF energy = -76.0672830670349
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 185 MB)
+E(MP2_Scanner) = -76.3419008454186  E_corr = -0.274617778383667
+E(SCS-MP2_Scanner) = -76.3391332992029  E_corr = -0.271850232167953
+E_corr(same-spin) = -0.0665666560297467
+E_corr(oppo-spin) = -0.20805112235392
+<class 'hsm.fixcav'> E_diel = -7.0594103141523
+<class 'hsm.fixcav'> E_diel = -7.05956507934882
+<class 'hsm.fixcav'> E_diel = -7.05865073137055
+<class 'hsm.fixcav'> E_diel = -7.05863122172923
+<class 'hsm.fixcav'> E_diel = -7.0587789932961
+<class 'hsm.fixcav'> E_diel = -7.05875220711965
+<class 'hsm.fixcav'> E_diel = -7.05875136519479
+<class 'hsm.fixcav'> E_diel = -7.05875145678854
+<class 'hsm.fixcav'> E_diel = -7.06194150353043
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000000000     0.0000000000     0.0127964127
+1 H    -0.0000000000     0.0042994418    -0.0063982064
+2 H     0.0000000000    -0.0042994418    -0.0063982064
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.002645886055   0.752331979206  -0.448646358385 AA    0.005000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 186 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0118221219695332
+Solvent Energy = -0.0118221219695332
+init E= -76.0649918041543
+  HOMO = -0.506064086111783  LUMO = 0.155776531166131
+<class 'hsm.fixcav'> E_diel = -0.011795982566334
+Solvent Energy = -0.011795982566334
+cycle= 1 E= -76.0671602118324  delta_E= -0.00217  |g|= 0.00114  |ddm|= 0.00255
+  HOMO = -0.505484454440317  LUMO = 0.156077753622462
+<class 'hsm.fixcav'> E_diel = -0.0117918333923141
+Solvent Energy = -0.0117918333923141
+cycle= 2 E= -76.0671605855559  delta_E= -3.74e-07  |g|= 0.000573  |ddm|= 0.000906
+  HOMO = -0.505712097779058  LUMO = 0.156039771122081
+<class 'hsm.fixcav'> E_diel = -0.0117928841726848
+Solvent Energy = -0.0117928841726848
+cycle= 3 E= -76.0671606497277  delta_E= -6.42e-08  |g|= 0.000183  |ddm|= 0.000324
+  HOMO = -0.50569908502426  LUMO = 0.156037751620814
+<class 'hsm.fixcav'> E_diel = -0.0117901824395538
+Solvent Energy = -0.0117901824395538
+cycle= 4 E= -76.0671606663972  delta_E= -1.67e-08  |g|= 5.22e-05  |ddm|= 0.000218
+  HOMO = -0.505706720999714  LUMO = 0.156038279444424
+<class 'hsm.fixcav'> E_diel = -0.0117893688139782
+Solvent Energy = -0.0117893688139782
+cycle= 5 E= -76.0671606684835  delta_E= -2.09e-09  |g|= 1.27e-05  |ddm|= 9.38e-05
+  HOMO = -0.505706376370184  LUMO = 0.156038807765416
+<class 'hsm.fixcav'> E_diel = -0.0117890835245735
+Solvent Energy = -0.0117890835245735
+cycle= 6 E= -76.06716066861  delta_E= -1.27e-10  |g|= 2.04e-06  |ddm|= 2.53e-05
+  HOMO = -0.505706703929369  LUMO = 0.156038816528576
+<class 'hsm.fixcav'> E_diel = -0.0117890859706622
+Solvent Energy = -0.0117890859706622
+cycle= 7 E= -76.0671606686129  delta_E= -2.9e-12  |g|= 4.1e-07  |ddm|= 3.72e-06
+  HOMO = -0.505706649005816  LUMO = 0.156038816986596
+<class 'hsm.fixcav'> E_diel = -0.0117890917704959
+Solvent Energy = -0.0117890917704959
+Extra cycle  E= -76.0671606686133  delta_E= -3.84e-13  |g|= 1.93e-07  |ddm|= 5.38e-07
+converged SCF energy = -76.0671606686133
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 186 MB)
+E(MP2_Scanner) = -76.3419042069926  E_corr = -0.274743538379243
+E(SCS-MP2_Scanner) = -76.3391355554975  E_corr = -0.271974886884147
+E_corr(same-spin) = -0.0665969528895511
+E_corr(oppo-spin) = -0.208146585489692
+<class 'hsm.fixcav'> E_diel = -7.05884102538668
+<class 'hsm.fixcav'> E_diel = -7.05900369224122
+<class 'hsm.fixcav'> E_diel = -7.05806959851132
+<class 'hsm.fixcav'> E_diel = -7.05804730448168
+<class 'hsm.fixcav'> E_diel = -7.05819867787987
+<class 'hsm.fixcav'> E_diel = -7.05817198609196
+<class 'hsm.fixcav'> E_diel = -7.05817120208101
+<class 'hsm.fixcav'> E_diel = -7.05817129884811
+<class 'hsm.fixcav'> E_diel = -7.06142424153925
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000312543    -0.0000030005     0.0151856429
+1 H     0.0000233554     0.0053261951    -0.0075940192
+2 H     0.0000078989    -0.0053231946    -0.0075916237
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H     -0.002645886055   0.752331979206  -0.448646358385 AA   -0.005000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 186 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117890481523989
+Solvent Energy = -0.0117890481523989
+init E= -76.0671518521345
+  HOMO = -0.505703338336437  LUMO = 0.156035998000352
+<class 'hsm.fixcav'> E_diel = -0.0117892116738911
+Solvent Energy = -0.0117892116738911
+cycle= 1 E= -76.0671602084803  delta_E= -8.36e-06  |g|= 0.000987  |ddm|= 0.00299
+  HOMO = -0.505703362442945  LUMO = 0.156039197929324
+<class 'hsm.fixcav'> E_diel = -0.0117890730092428
+Solvent Energy = -0.0117890730092428
+cycle= 2 E= -76.0671605781702  delta_E= -3.7e-07  |g|= 0.000349  |ddm|= 0.000995
+  HOMO = -0.505710157684858  LUMO = 0.156038349436923
+<class 'hsm.fixcav'> E_diel = -0.0117891646312211
+Solvent Energy = -0.0117891646312211
+cycle= 3 E= -76.0671606612616  delta_E= -8.31e-08  |g|= 9.27e-05  |ddm|= 0.000629
+  HOMO = -0.505703117923991  LUMO = 0.156039267958129
+<class 'hsm.fixcav'> E_diel = -0.0117890360082896
+Solvent Energy = -0.0117890360082896
+cycle= 4 E= -76.0671606682701  delta_E= -7.01e-09  |g|= 2.23e-05  |ddm|= 0.000193
+  HOMO = -0.505709035130916  LUMO = 0.156038506467453
+<class 'hsm.fixcav'> E_diel = -0.0117891389377435
+Solvent Energy = -0.0117891389377435
+cycle= 5 E= -76.0671606685904  delta_E= -3.2e-10  |g|= 8.59e-06  |ddm|= 3.76e-05
+  HOMO = -0.50570639027727  LUMO = 0.156038845027999
+<class 'hsm.fixcav'> E_diel = -0.0117890923140118
+Solvent Energy = -0.0117890923140118
+cycle= 6 E= -76.0671606686117  delta_E= -2.14e-11  |g|= 1.51e-06  |ddm|= 8.21e-06
+  HOMO = -0.505706647516091  LUMO = 0.156038812112462
+<class 'hsm.fixcav'> E_diel = -0.0117890968848101
+Solvent Energy = -0.0117890968848101
+cycle= 7 E= -76.067160668613  delta_E= -1.24e-12  |g|= 2.26e-07  |ddm|= 3.13e-06
+  HOMO = -0.505706637337447  LUMO = 0.156038813364739
+<class 'hsm.fixcav'> E_diel = -0.0117890967465362
+Solvent Energy = -0.0117890967465362
+Extra cycle  E= -76.067160668613  delta_E= -7.11e-14  |g|= 9.24e-08  |ddm|= 3.58e-07
+converged SCF energy = -76.067160668613
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 187 MB)
+E(MP2_Scanner) = -76.3419042069838  E_corr = -0.274743538370756
+E(SCS-MP2_Scanner) = -76.3391355553248  E_corr = -0.271974886711804
+E_corr(same-spin) = -0.0665969530766581
+E_corr(oppo-spin) = -0.208146585294098
+<class 'hsm.fixcav'> E_diel = -7.05884102530582
+<class 'hsm.fixcav'> E_diel = -7.05900369214388
+<class 'hsm.fixcav'> E_diel = -7.05806959850799
+<class 'hsm.fixcav'> E_diel = -7.05804730451532
+<class 'hsm.fixcav'> E_diel = -7.05819867787354
+<class 'hsm.fixcav'> E_diel = -7.05817198609209
+<class 'hsm.fixcav'> E_diel = -7.05817120208102
+<class 'hsm.fixcav'> E_diel = -7.0581712988481
+<class 'hsm.fixcav'> E_diel = -7.06142424117374
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O     0.0000312425    -0.0000030005     0.0151856721
+1 H    -0.0000233332     0.0053261994    -0.0075940338
+2 H    -0.0000079094    -0.0053231989    -0.0075916383
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.754977865260  -0.448646358385 AA    0.000000000000   1.426701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 187 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.011819923697316
+Solvent Energy = -0.011819923697316
+init E= -76.0659629563213
+  HOMO = -0.505766491943008  LUMO = 0.155816006120256
+<class 'hsm.fixcav'> E_diel = -0.0118083663456796
+Solvent Energy = -0.0118083663456796
+cycle= 1 E= -76.0670995287571  delta_E= -0.00114  |g|= 0.000909  |ddm|= 0.00209
+  HOMO = -0.505462515588087  LUMO = 0.155969562883635
+<class 'hsm.fixcav'> E_diel = -0.0118065992813572
+Solvent Energy = -0.0118065992813572
+cycle= 2 E= -76.0670997511903  delta_E= -2.22e-07  |g|= 0.000364  |ddm|= 0.000769
+  HOMO = -0.505606184957979  LUMO = 0.1559445364687
+<class 'hsm.fixcav'> E_diel = -0.0118077799489171
+Solvent Energy = -0.0118077799489171
+cycle= 3 E= -76.0670997821686  delta_E= -3.1e-08  |g|= 0.000147  |ddm|= 0.000259
+  HOMO = -0.505576234367628  LUMO = 0.155946316032327
+<class 'hsm.fixcav'> E_diel = -0.0118065261766625
+Solvent Energy = -0.0118065261766625
+cycle= 4 E= -76.0670997907866  delta_E= -8.62e-09  |g|= 4.56e-05  |ddm|= 0.000156
+  HOMO = -0.505583812784324  LUMO = 0.155945594749441
+<class 'hsm.fixcav'> E_diel = -0.0118063752228289
+Solvent Energy = -0.0118063752228289
+cycle= 5 E= -76.0670997922145  delta_E= -1.43e-09  |g|= 1.15e-05  |ddm|= 7.89e-05
+  HOMO = -0.505582705404461  LUMO = 0.15594597108319
+<class 'hsm.fixcav'> E_diel = -0.0118062828940944
+Solvent Energy = -0.0118062828940944
+cycle= 6 E= -76.0670997923216  delta_E= -1.07e-10  |g|= 1.83e-06  |ddm|= 2.38e-05
+  HOMO = -0.505582892165507  LUMO = 0.155945965150957
+<class 'hsm.fixcav'> E_diel = -0.0118062917739554
+Solvent Energy = -0.0118062917739554
+cycle= 7 E= -76.0670997923239  delta_E= -2.36e-12  |g|= 3.15e-07  |ddm|= 3.74e-06
+  HOMO = -0.505582853521743  LUMO = 0.15594596848661
+<class 'hsm.fixcav'> E_diel = -0.0118062947668133
+Solvent Energy = -0.0118062947668133
+Extra cycle  E= -76.0670997923241  delta_E= -1.71e-13  |g|= 1.3e-07  |ddm|= 3.61e-07
+converged SCF energy = -76.0670997923241
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 187 MB)
+E(MP2_Scanner) = -76.3419022253207  E_corr = -0.274802432996582
+E(SCS-MP2_Scanner) = -76.3391341133119  E_corr = -0.272034320987787
+E_corr(same-spin) = -0.0666099214708967
+E_corr(oppo-spin) = -0.208192511525685
+<class 'hsm.fixcav'> E_diel = -7.05857679794193
+<class 'hsm.fixcav'> E_diel = -7.05874088200225
+<class 'hsm.fixcav'> E_diel = -7.05780159254741
+<class 'hsm.fixcav'> E_diel = -7.0577790232212
+<class 'hsm.fixcav'> E_diel = -7.05793133141194
+<class 'hsm.fixcav'> E_diel = -7.05790455354499
+<class 'hsm.fixcav'> E_diel = -7.05790376744919
+<class 'hsm.fixcav'> E_diel = -7.05790386449319
+<class 'hsm.fixcav'> E_diel = -7.06117405225971
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000000166    -0.0017064290     0.0161976346
+1 H     0.0000000093     0.0071804854    -0.0087659678
+2 H     0.0000000073    -0.0054740565    -0.0074316668
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.749686093151  -0.448646358385 AA    0.000000000000   1.416701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 188 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117453056811763
+Solvent Energy = -0.0117453056811763
+init E= -76.0694903930894
+  HOMO = -0.505468628903961  LUMO = 0.156386918608207
+<class 'hsm.fixcav'> E_diel = -0.0117679555290968
+Solvent Energy = -0.0117679555290968
+cycle= 1 E= -76.0672119348619  delta_E= 0.00228  |g|= 0.00152  |ddm|= 0.00294
+  HOMO = -0.506067290699366  LUMO = 0.156084224367626
+<class 'hsm.fixcav'> E_diel = -0.0117713473691237
+Solvent Energy = -0.0117713473691237
+cycle= 2 E= -76.0672124505462  delta_E= -5.16e-07  |g|= 0.000627  |ddm|= 0.00117
+  HOMO = -0.505809098898826  LUMO = 0.15612914568272
+<class 'hsm.fixcav'> E_diel = -0.0117692904746154
+Solvent Energy = -0.0117692904746154
+cycle= 3 E= -76.0672125117478  delta_E= -6.12e-08  |g|= 0.000177  |ddm|= 0.000315
+  HOMO = -0.505844758368584  LUMO = 0.156128834648924
+<class 'hsm.fixcav'> E_diel = -0.0117713184824777
+Solvent Energy = -0.0117713184824777
+cycle= 4 E= -76.0672125207813  delta_E= -9.03e-09  |g|= 4.75e-05  |ddm|= 0.000135
+  HOMO = -0.505831438951644  LUMO = 0.156130806751703
+<class 'hsm.fixcav'> E_diel = -0.0117717568912024
+Solvent Energy = -0.0117717568912024
+cycle= 5 E= -76.0672125219002  delta_E= -1.12e-09  |g|= 9.89e-06  |ddm|= 5.82e-05
+  HOMO = -0.505831447345104  LUMO = 0.156130542558577
+<class 'hsm.fixcav'> E_diel = -0.0117719905503597
+Solvent Energy = -0.0117719905503597
+cycle= 6 E= -76.0672125219661  delta_E= -6.59e-11  |g|= 1.85e-06  |ddm|= 1.36e-05
+  HOMO = -0.505831031322695  LUMO = 0.156130523712925
+<class 'hsm.fixcav'> E_diel = -0.0117720235144978
+Solvent Energy = -0.0117720235144978
+cycle= 7 E= -76.0672125219678  delta_E= -1.71e-12  |g|= 2.8e-07  |ddm|= 3.62e-06
+  HOMO = -0.50583102049135  LUMO = 0.15613051923888
+<class 'hsm.fixcav'> E_diel = -0.0117720248070346
+Solvent Energy = -0.0117720248070346
+Extra cycle  E= -76.067212521968  delta_E= -2.27e-13  |g|= 1.2e-07  |ddm|= 3.52e-07
+converged SCF energy = -76.067212521968
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 188 MB)
+E(MP2_Scanner) = -76.3418970864621  E_corr = -0.274684564494123
+E(SCS-MP2_Scanner) = -76.3391279045318  E_corr = -0.271915382563757
+E_corr(same-spin) = -0.0665839555721432
+E_corr(oppo-spin) = -0.20810060892198
+<class 'hsm.fixcav'> E_diel = -7.05910351899739
+<class 'hsm.fixcav'> E_diel = -7.05926477552224
+<class 'hsm.fixcav'> E_diel = -7.05833585440638
+<class 'hsm.fixcav'> E_diel = -7.05831382801544
+<class 'hsm.fixcav'> E_diel = -7.05846427459643
+<class 'hsm.fixcav'> E_diel = -7.05843766883741
+<class 'hsm.fixcav'> E_diel = -7.05843688673358
+<class 'hsm.fixcav'> E_diel = -7.05843698325858
+<class 'hsm.fixcav'> E_diel = -7.06167276198957
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000000000     0.0017236170     0.0141479449
+1 H     0.0000000000     0.0034473159    -0.0063956958
+2 H     0.0000000000    -0.0051709329    -0.0077522490
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.446000472330 AA    0.000000000000   1.421701395451  -0.842818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 189 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.011760115145759
+Solvent Energy = -0.011760115145759
+init E= -76.0671623379355
+  HOMO = -0.505764322308457  LUMO = 0.156108035092566
+<class 'hsm.fixcav'> E_diel = -0.0117613258996818
+Solvent Energy = -0.0117613258996818
+cycle= 1 E= -76.0672189349461  delta_E= -5.66e-05  |g|= 0.00053  |ddm|= 0.00166
+  HOMO = -0.505749489191347  LUMO = 0.156111319646947
+<class 'hsm.fixcav'> E_diel = -0.0117615496859431
+Solvent Energy = -0.0117615496859431
+cycle= 2 E= -76.067219029648  delta_E= -9.47e-08  |g|= 0.000164  |ddm|= 0.00051
+  HOMO = -0.505774736260294  LUMO = 0.156105791358882
+<class 'hsm.fixcav'> E_diel = -0.0117623991202973
+Solvent Energy = -0.0117623991202973
+cycle= 3 E= -76.0672190422842  delta_E= -1.26e-08  |g|= 5.19e-05  |ddm|= 0.000251
+  HOMO = -0.505756829911373  LUMO = 0.156107909966571
+<class 'hsm.fixcav'> E_diel = -0.011762294484384
+Solvent Energy = -0.011762294484384
+cycle= 4 E= -76.0672190430562  delta_E= -7.72e-10  |g|= 1.64e-05  |ddm|= 4.72e-05
+  HOMO = -0.50575987642982  LUMO = 0.156107401351754
+<class 'hsm.fixcav'> E_diel = -0.0117624989287031
+Solvent Energy = -0.0117624989287031
+cycle= 5 E= -76.0672190431802  delta_E= -1.24e-10  |g|= 3.29e-06  |ddm|= 2.18e-05
+  HOMO = -0.505759412104189  LUMO = 0.156107379811692
+<class 'hsm.fixcav'> E_diel = -0.0117625383146167
+Solvent Energy = -0.0117625383146167
+cycle= 6 E= -76.0672190431869  delta_E= -6.74e-12  |g|= 6.5e-07  |ddm|= 4.66e-06
+  HOMO = -0.505759380838977  LUMO = 0.156107381528578
+<class 'hsm.fixcav'> E_diel = -0.0117625463271895
+Solvent Energy = -0.0117625463271895
+Extra cycle  E= -76.0672190431871  delta_E= -2.42e-13  |g|= 2.67e-07  |ddm|= 7.03e-07
+converged SCF energy = -76.0672190431871
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 189 MB)
+E(MP2_Scanner) = -76.3418995698726  E_corr = -0.274680526685434
+E(SCS-MP2_Scanner) = -76.3391315471911  E_corr = -0.271912504003973
+E_corr(same-spin) = -0.0665816861752474
+E_corr(oppo-spin) = -0.208098840510187
+<class 'hsm.fixcav'> E_diel = -7.05892994273326
+<class 'hsm.fixcav'> E_diel = -7.0590929963409
+<class 'hsm.fixcav'> E_diel = -7.05815958010675
+<class 'hsm.fixcav'> E_diel = -7.05813734909816
+<class 'hsm.fixcav'> E_diel = -7.05828816927849
+<class 'hsm.fixcav'> E_diel = -7.05826168330184
+<class 'hsm.fixcav'> E_diel = -7.05826091056713
+<class 'hsm.fixcav'> E_diel = -7.05826100725496
+<class 'hsm.fixcav'> E_diel = -7.06151136868288
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000000000     0.0013443501     0.0139817844
+1 H     0.0000000000     0.0041311607    -0.0064466530
+2 H     0.0000000000    -0.0054755108    -0.0075351315
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.451292244439 AA    0.000000000000   1.421701395451  -0.852818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 189 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0118479946220712
+Solvent Energy = -0.0118479946220712
+init E= -76.0649297237575
+  HOMO = -0.506018382391931  LUMO = 0.155707401322159
+<class 'hsm.fixcav'> E_diel = -0.0118223667809553
+Solvent Energy = -0.0118223667809553
+cycle= 1 E= -76.0670961916121  delta_E= -0.00217  |g|= 0.00147  |ddm|= 0.00317
+  HOMO = -0.505432382732477  LUMO = 0.156009095078173
+<class 'hsm.fixcav'> E_diel = -0.0118183260791918
+Solvent Energy = -0.0118183260791918
+cycle= 2 E= -76.0670967045842  delta_E= -5.13e-07  |g|= 0.000592  |ddm|= 0.00101
+  HOMO = -0.505679133901796  LUMO = 0.155967663496456
+<class 'hsm.fixcav'> E_diel = -0.0118195398382859
+Solvent Energy = -0.0118195398382859
+cycle= 3 E= -76.0670967742094  delta_E= -6.96e-08  |g|= 0.000211  |ddm|= 0.000355
+  HOMO = -0.50564004388082  LUMO = 0.155970036436605
+<class 'hsm.fixcav'> E_diel = -0.011816852595467
+Solvent Energy = -0.011816852595467
+cycle= 4 E= -76.0670967905876  delta_E= -1.64e-08  |g|= 6.41e-05  |ddm|= 0.000183
+  HOMO = -0.505654520682635  LUMO = 0.155969034932841
+<class 'hsm.fixcav'> E_diel = -0.0118160383277841
+Solvent Energy = -0.0118160383277841
+cycle= 5 E= -76.0670967930311  delta_E= -2.44e-09  |g|= 1.3e-05  |ddm|= 9.42e-05
+  HOMO = -0.505653730346886  LUMO = 0.155969740015616
+<class 'hsm.fixcav'> E_diel = -0.0118157219664236
+Solvent Energy = -0.0118157219664236
+cycle= 6 E= -76.0670967931445  delta_E= -1.13e-10  |g|= 1.93e-06  |ddm|= 2.18e-05
+  HOMO = -0.505654208568712  LUMO = 0.155969745674255
+<class 'hsm.fixcav'> E_diel = -0.0118156965898897
+Solvent Energy = -0.0118156965898897
+cycle= 7 E= -76.067096793146  delta_E= -1.56e-12  |g|= 2.32e-07  |ddm|= 2.78e-06
+  HOMO = -0.505654202012824  LUMO = 0.155969750308362
+<class 'hsm.fixcav'> E_diel = -0.0118156969102118
+Solvent Energy = -0.0118156969102118
+Extra cycle  E= -76.0670967931462  delta_E= -1.71e-13  |g|= 8.91e-08  |ddm|= 2.65e-07
+converged SCF energy = -76.0670967931462
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 189 MB)
+E(MP2_Scanner) = -76.3419033449766  E_corr = -0.274806551830422
+E(SCS-MP2_Scanner) = -76.3391340631155  E_corr = -0.272037269969232
+E_corr(same-spin) = -0.0666122218007009
+E_corr(oppo-spin) = -0.208194330029721
+<class 'hsm.fixcav'> E_diel = -7.05875111498129
+<class 'hsm.fixcav'> E_diel = -7.05891339087382
+<class 'hsm.fixcav'> E_diel = -7.05797862032321
+<class 'hsm.fixcav'> E_diel = -7.0579562607833
+<class 'hsm.fixcav'> E_diel = -7.05810819011557
+<class 'hsm.fixcav'> E_diel = -7.05808129138187
+<class 'hsm.fixcav'> E_diel = -7.05808049599047
+<class 'hsm.fixcav'> E_diel = -7.05808059285363
+<class 'hsm.fixcav'> E_diel = -7.06133612140431
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O     0.0000000000    -0.0013284007     0.0163801320
+1 H    -0.0000000000     0.0065000853    -0.0087321473
+2 H    -0.0000000000    -0.0051716846    -0.0076479847
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.002645886055  -0.752331979206  -0.448646358385 AA    0.005000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 189 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117731115548783
+Solvent Energy = -0.0117731115548783
+init E= -76.0682387709334
+  HOMO = -0.50552741499249  LUMO = 0.156167807640537
+<class 'hsm.fixcav'> E_diel = -0.01178585832895
+Solvent Energy = -0.01178585832895
+cycle= 1 E= -76.0671604048535  delta_E= 0.00108  |g|= 0.000882  |ddm|= 0.00218
+  HOMO = -0.505815051967449  LUMO = 0.15601949892375
+<class 'hsm.fixcav'> E_diel = -0.0117877597934715
+Solvent Energy = -0.0117877597934715
+cycle= 2 E= -76.0671606243946  delta_E= -2.2e-07  |g|= 0.000338  |ddm|= 0.000708
+  HOMO = -0.505681570665115  LUMO = 0.156042003210678
+<class 'hsm.fixcav'> E_diel = -0.0117871457280105
+Solvent Energy = -0.0117871457280105
+cycle= 3 E= -76.0671606575107  delta_E= -3.31e-08  |g|= 0.000154  |ddm|= 0.000283
+  HOMO = -0.50571375531373  LUMO = 0.156038900530244
+<class 'hsm.fixcav'> E_diel = -0.0117886713595405
+Solvent Energy = -0.0117886713595405
+cycle= 4 E= -76.0671606670936  delta_E= -9.58e-09  |g|= 4.61e-05  |ddm|= 0.000162
+  HOMO = -0.50570587150675  LUMO = 0.15603921114671
+<class 'hsm.fixcav'> E_diel = -0.0117889784998843
+Solvent Energy = -0.0117889784998843
+cycle= 5 E= -76.0671606685292  delta_E= -1.44e-09  |g|= 1.03e-05  |ddm|= 8.02e-05
+  HOMO = -0.505706839642796  LUMO = 0.156038788706232
+<class 'hsm.fixcav'> E_diel = -0.0117891081799135
+Solvent Energy = -0.0117891081799135
+cycle= 6 E= -76.0671606686105  delta_E= -8.13e-11  |g|= 1.71e-06  |ddm|= 2e-05
+  HOMO = -0.505706594760278  LUMO = 0.156038812848966
+<class 'hsm.fixcav'> E_diel = -0.0117891028987611
+Solvent Energy = -0.0117891028987611
+cycle= 7 E= -76.067160668613  delta_E= -2.5e-12  |g|= 3.49e-07  |ddm|= 3.23e-06
+  HOMO = -0.505706639212911  LUMO = 0.156038809828133
+<class 'hsm.fixcav'> E_diel = -0.0117890997022171
+Solvent Energy = -0.0117890997022171
+Extra cycle  E= -76.0671606686132  delta_E= -1.42e-13  |g|= 1.59e-07  |ddm|= 4.06e-07
+converged SCF energy = -76.0671606686132
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 189 MB)
+E(MP2_Scanner) = -76.3419042071197  E_corr = -0.274743538506509
+E(SCS-MP2_Scanner) = -76.3391355553162  E_corr = -0.271974886703093
+E_corr(same-spin) = -0.0665969532746739
+E_corr(oppo-spin) = -0.208146585231835
+<class 'hsm.fixcav'> E_diel = -7.05884102525323
+<class 'hsm.fixcav'> E_diel = -7.05900369208538
+<class 'hsm.fixcav'> E_diel = -7.0580695985105
+<class 'hsm.fixcav'> E_diel = -7.05804730453532
+<class 'hsm.fixcav'> E_diel = -7.05819867786963
+<class 'hsm.fixcav'> E_diel = -7.05817198609211
+<class 'hsm.fixcav'> E_diel = -7.05817120208104
+<class 'hsm.fixcav'> E_diel = -7.0581712988481
+<class 'hsm.fixcav'> E_diel = -7.06142424093963
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000312484     0.0000030000     0.0151856856
+1 H     0.0000079000     0.0053232002    -0.0075916551
+2 H     0.0000233484    -0.0053262001    -0.0075940305
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H     -0.002645886055  -0.752331979206  -0.448646358385 AA   -0.005000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 190 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117890560884531
+Solvent Energy = -0.0117890560884531
+init E= -76.0671518519594
+  HOMO = -0.505703306931806  LUMO = 0.15603599838153
+<class 'hsm.fixcav'> E_diel = -0.0117892147765589
+Solvent Energy = -0.0117892147765589
+cycle= 1 E= -76.0671602084589  delta_E= -8.36e-06  |g|= 0.000987  |ddm|= 0.00299
+  HOMO = -0.505703363146789  LUMO = 0.156039196196582
+<class 'hsm.fixcav'> E_diel = -0.011789074679929
+Solvent Energy = -0.011789074679929
+cycle= 2 E= -76.0671605781648  delta_E= -3.7e-07  |g|= 0.000349  |ddm|= 0.000995
+  HOMO = -0.505710144255591  LUMO = 0.156038350754699
+<class 'hsm.fixcav'> E_diel = -0.0117891647914934
+Solvent Energy = -0.0117891647914934
+cycle= 3 E= -76.0671606612616  delta_E= -8.31e-08  |g|= 9.27e-05  |ddm|= 0.000629
+  HOMO = -0.505703128313359  LUMO = 0.156039266587923
+<class 'hsm.fixcav'> E_diel = -0.0117890362192556
+Solvent Energy = -0.0117890362192556
+cycle= 4 E= -76.0671606682702  delta_E= -7.01e-09  |g|= 2.23e-05  |ddm|= 0.000193
+  HOMO = -0.505709032107319  LUMO = 0.156038506860508
+<class 'hsm.fixcav'> E_diel = -0.0117891388713488
+Solvent Energy = -0.0117891388713488
+cycle= 5 E= -76.0671606685906  delta_E= -3.2e-10  |g|= 8.57e-06  |ddm|= 3.76e-05
+  HOMO = -0.505706389646876  LUMO = 0.156038845117117
+<class 'hsm.fixcav'> E_diel = -0.0117890922930472
+Solvent Energy = -0.0117890922930472
+cycle= 6 E= -76.0671606686118  delta_E= -2.12e-11  |g|= 1.51e-06  |ddm|= 8.19e-06
+  HOMO = -0.505706647555137  LUMO = 0.156038812110984
+<class 'hsm.fixcav'> E_diel = -0.0117890968818101
+Solvent Energy = -0.0117890968818101
+cycle= 7 E= -76.0671606686132  delta_E= -1.38e-12  |g|= 2.26e-07  |ddm|= 3.12e-06
+  HOMO = -0.505706637334323  LUMO = 0.156038813366829
+<class 'hsm.fixcav'> E_diel = -0.0117890967447752
+Solvent Energy = -0.0117890967447752
+Extra cycle  E= -76.0671606686134  delta_E= -1.56e-13  |g|= 9.24e-08  |ddm|= 3.58e-07
+converged SCF energy = -76.0671606686134
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 190 MB)
+E(MP2_Scanner) = -76.341904206984  E_corr = -0.274743538370641
+E(SCS-MP2_Scanner) = -76.3391355553252  E_corr = -0.271974886711792
+E_corr(same-spin) = -0.0665969530765121
+E_corr(oppo-spin) = -0.208146585294129
+<class 'hsm.fixcav'> E_diel = -7.05884102530586
+<class 'hsm.fixcav'> E_diel = -7.05900369214391
+<class 'hsm.fixcav'> E_diel = -7.05806959850799
+<class 'hsm.fixcav'> E_diel = -7.05804730451531
+<class 'hsm.fixcav'> E_diel = -7.05819867787354
+<class 'hsm.fixcav'> E_diel = -7.05817198609208
+<class 'hsm.fixcav'> E_diel = -7.05817120208103
+<class 'hsm.fixcav'> E_diel = -7.0581712988481
+<class 'hsm.fixcav'> E_diel = -7.06142424117391
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O     0.0000312425     0.0000030005     0.0151856721
+1 H    -0.0000079094     0.0053231989    -0.0075916383
+2 H    -0.0000233332    -0.0053261994    -0.0075940338
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.749686093151  -0.448646358385 AA    0.000000000000  -1.416701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 188 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117585569934169
+Solvent Energy = -0.0117585569934169
+init E= -76.0683491417747
+  HOMO = -0.505648902538371  LUMO = 0.156258091520147
+<class 'hsm.fixcav'> E_diel = -0.0117700302984419
+Solvent Energy = -0.0117700302984419
+cycle= 1 E= -76.0672122606617  delta_E= 0.00114  |g|= 0.000905  |ddm|= 0.0021
+  HOMO = -0.50594842742049  LUMO = 0.156107439230569
+<class 'hsm.fixcav'> E_diel = -0.0117716814669756
+Solvent Energy = -0.0117716814669756
+cycle= 2 E= -76.0672124818189  delta_E= -2.21e-07  |g|= 0.000357  |ddm|= 0.000766
+  HOMO = -0.505807359971406  LUMO = 0.156132038213486
+<class 'hsm.fixcav'> E_diel = -0.01177056322971
+Solvent Energy = -0.01177056322971
+cycle= 3 E= -76.0672125120887  delta_E= -3.03e-08  |g|= 0.000146  |ddm|= 0.000259
+  HOMO = -0.505837711380295  LUMO = 0.156130149252672
+<class 'hsm.fixcav'> E_diel = -0.0117718046134878
+Solvent Energy = -0.0117718046134878
+cycle= 4 E= -76.0672125204756  delta_E= -8.39e-09  |g|= 4.52e-05  |ddm|= 0.000154
+  HOMO = -0.505830041496139  LUMO = 0.1561308853415
+<class 'hsm.fixcav'> E_diel = -0.0117719489806601
+Solvent Energy = -0.0117719489806601
+cycle= 5 E= -76.0672125218614  delta_E= -1.39e-09  |g|= 1.14e-05  |ddm|= 7.78e-05
+  HOMO = -0.505831141555709  LUMO = 0.156130514709822
+<class 'hsm.fixcav'> E_diel = -0.0117720401594331
+Solvent Energy = -0.0117720401594331
+cycle= 6 E= -76.0672125219655  delta_E= -1.04e-10  |g|= 1.82e-06  |ddm|= 2.35e-05
+  HOMO = -0.505830957103396  LUMO = 0.156130520361067
+<class 'hsm.fixcav'> E_diel = -0.0117720315765736
+Solvent Energy = -0.0117720315765736
+cycle= 7 E= -76.0672125219678  delta_E= -2.25e-12  |g|= 3.1e-07  |ddm|= 3.72e-06
+  HOMO = -0.505830994551875  LUMO = 0.156130517083233
+<class 'hsm.fixcav'> E_diel = -0.0117720286669644
+Solvent Energy = -0.0117720286669644
+Extra cycle  E= -76.0672125219678  delta_E=    0  |g|= 1.28e-07  |ddm|= 3.57e-07
+converged SCF energy = -76.0672125219678
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 190 MB)
+E(MP2_Scanner) = -76.3418970872892  E_corr = -0.274684565321453
+E(SCS-MP2_Scanner) = -76.3391279049749  E_corr = -0.271915383007079
+E_corr(same-spin) = -0.0665839562061513
+E_corr(oppo-spin) = -0.208100609115301
+<class 'hsm.fixcav'> E_diel = -7.05910351894617
+<class 'hsm.fixcav'> E_diel = -7.05926477553562
+<class 'hsm.fixcav'> E_diel = -7.05833585436952
+<class 'hsm.fixcav'> E_diel = -7.05831382808933
+<class 'hsm.fixcav'> E_diel = -7.05846427459221
+<class 'hsm.fixcav'> E_diel = -7.0584376688374
+<class 'hsm.fixcav'> E_diel = -7.05843688673358
+<class 'hsm.fixcav'> E_diel = -7.05843698325857
+<class 'hsm.fixcav'> E_diel = -7.06167276208113
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000000159    -0.0017236028     0.0141479679
+1 H     0.0000000068     0.0051709295    -0.0077522485
+2 H     0.0000000091    -0.0034473267    -0.0063957194
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.754977865260  -0.448646358385 AA    0.000000000000  -1.426701395451  -0.847818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 191 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0118337717611011
+Solvent Energy = -0.0118337717611011
+init E= -76.0648307928701
+  HOMO = -0.50595200294713  LUMO = 0.155687288006579
+<class 'hsm.fixcav'> E_diel = -0.0118103580188455
+Solvent Energy = -0.0118103580188455
+cycle= 1 E= -76.0670992002331  delta_E= -0.00227  |g|= 0.00153  |ddm|= 0.00293
+  HOMO = -0.50534360186109  LUMO = 0.155993026057998
+<class 'hsm.fixcav'> E_diel = -0.0118069126369905
+Solvent Energy = -0.0118069126369905
+cycle= 2 E= -76.0670997195134  delta_E= -5.19e-07  |g|= 0.000636  |ddm|= 0.00117
+  HOMO = -0.505604585201882  LUMO = 0.15594746459152
+<class 'hsm.fixcav'> E_diel = -0.0118090474633615
+Solvent Energy = -0.0118090474633615
+cycle= 3 E= -76.067099782074  delta_E= -6.26e-08  |g|= 0.000178  |ddm|= 0.000317
+  HOMO = -0.50556907211588  LUMO = 0.155947672433516
+<class 'hsm.fixcav'> E_diel = -0.0118070117186859
+Solvent Energy = -0.0118070117186859
+cycle= 4 E= -76.0670997911375  delta_E= -9.06e-09  |g|= 4.74e-05  |ddm|= 0.000136
+  HOMO = -0.505582370719657  LUMO = 0.15594568252952
+<class 'hsm.fixcav'> E_diel = -0.0118065704602825
+Solvent Energy = -0.0118065704602825
+cycle= 5 E= -76.067099792256  delta_E= -1.12e-09  |g|= 9.89e-06  |ddm|= 5.83e-05
+  HOMO = -0.505582391878961  LUMO = 0.155945942801254
+<class 'hsm.fixcav'> E_diel = -0.0118063341836683
+Solvent Energy = -0.0118063341836683
+cycle= 6 E= -76.0670997923219  delta_E= -6.59e-11  |g|= 1.87e-06  |ddm|= 1.37e-05
+  HOMO = -0.505582815498157  LUMO = 0.15594596182025
+<class 'hsm.fixcav'> E_diel = -0.0118063001327609
+Solvent Energy = -0.0118063001327609
+cycle= 7 E= -76.0670997923239  delta_E= -2.05e-12  |g|= 2.83e-07  |ddm|= 3.65e-06
+  HOMO = -0.50558282687506  LUMO = 0.155945966277631
+<class 'hsm.fixcav'> E_diel = -0.0118062987781216
+Solvent Energy = -0.0118062987781216
+Extra cycle  E= -76.0670997923241  delta_E= -1.99e-13  |g|= 1.22e-07  |ddm|= 3.55e-07
+converged SCF energy = -76.0670997923241
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 191 MB)
+E(MP2_Scanner) = -76.3419022262077  E_corr = -0.274802433883512
+E(SCS-MP2_Scanner) = -76.3391341137916  E_corr = -0.272034321467489
+E_corr(same-spin) = -0.0666099221454517
+E_corr(oppo-spin) = -0.20819251173806
+<class 'hsm.fixcav'> E_diel = -7.05857679788808
+<class 'hsm.fixcav'> E_diel = -7.05874088201862
+<class 'hsm.fixcav'> E_diel = -7.05780159250824
+<class 'hsm.fixcav'> E_diel = -7.057779023301
+<class 'hsm.fixcav'> E_diel = -7.05793133140757
+<class 'hsm.fixcav'> E_diel = -7.05790455354495
+<class 'hsm.fixcav'> E_diel = -7.0579037674492
+<class 'hsm.fixcav'> E_diel = -7.05790386449319
+<class 'hsm.fixcav'> E_diel = -7.06117405236571
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000000000     0.0017064435     0.0161976580
+1 H     0.0000000000     0.0054740529    -0.0074316662
+2 H     0.0000000000    -0.0071804965    -0.0087659918
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.446000472330 AA    0.000000000000  -1.421701395451  -0.842818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 190 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0117333417108251
+Solvent Energy = -0.0117333417108251
+init E= -76.0694418935256
+  HOMO = -0.505398498077189  LUMO = 0.15636578679957
+<class 'hsm.fixcav'> E_diel = -0.0117572535359569
+Solvent Energy = -0.0117572535359569
+cycle= 1 E= -76.0672185588449  delta_E= 0.00222  |g|= 0.00139  |ddm|= 0.00257
+  HOMO = -0.505987128345034  LUMO = 0.15606478981213
+<class 'hsm.fixcav'> E_diel = -0.011760890048174
+Solvent Energy = -0.011760890048174
+cycle= 2 E= -76.0672189773209  delta_E= -4.18e-07  |g|= 0.000585  |ddm|= 0.000965
+  HOMO = -0.505744617958152  LUMO = 0.156106278271299
+<class 'hsm.fixcav'> E_diel = -0.0117593381007224
+Solvent Energy = -0.0117593381007224
+cycle= 3 E= -76.0672190323976  delta_E= -5.51e-08  |g|= 0.000164  |ddm|= 0.000285
+  HOMO = -0.505773869666784  LUMO = 0.156106091169503
+<class 'hsm.fixcav'> E_diel = -0.0117615192138714
+Solvent Energy = -0.0117615192138714
+cycle= 4 E= -76.0672190415005  delta_E= -9.1e-09  |g|= 5.22e-05  |ddm|= 0.000119
+  HOMO = -0.505759461478977  LUMO = 0.156107921468278
+<class 'hsm.fixcav'> E_diel = -0.011762229597238
+Solvent Energy = -0.011762229597238
+cycle= 5 E= -76.0672190430912  delta_E= -1.59e-09  |g|= 1.16e-05  |ddm|= 6.6e-05
+  HOMO = -0.505759677543852  LUMO = 0.156107423936734
+<class 'hsm.fixcav'> E_diel = -0.011762531497279
+Solvent Energy = -0.011762531497279
+cycle= 6 E= -76.0672190431853  delta_E= -9.41e-11  |g|= 1.67e-06  |ddm|= 1.93e-05
+  HOMO = -0.50575933585192  LUMO = 0.156107386668192
+<class 'hsm.fixcav'> E_diel = -0.0117625540301139
+Solvent Energy = -0.0117625540301139
+cycle= 7 E= -76.0672190431871  delta_E= -1.71e-12  |g|= 1.77e-07  |ddm|= 3.11e-06
+  HOMO = -0.505759345850522  LUMO = 0.156107380475719
+<class 'hsm.fixcav'> E_diel = -0.0117625528281328
+Solvent Energy = -0.0117625528281328
+Extra cycle  E= -76.0672190431872  delta_E= -1.28e-13  |g|= 6.47e-08  |ddm|= 1.96e-07
+converged SCF energy = -76.0672190431872
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 190 MB)
+E(MP2_Scanner) = -76.3418995693775  E_corr = -0.274680526190339
+E(SCS-MP2_Scanner) = -76.3391315466697  E_corr = -0.271912503482502
+E_corr(same-spin) = -0.0665816860914292
+E_corr(oppo-spin) = -0.20809884009891
+<class 'hsm.fixcav'> E_diel = -7.05892994262463
+<class 'hsm.fixcav'> E_diel = -7.0590929962129
+<class 'hsm.fixcav'> E_diel = -7.05815958008606
+<class 'hsm.fixcav'> E_diel = -7.05813734914892
+<class 'hsm.fixcav'> E_diel = -7.05828816926942
+<class 'hsm.fixcav'> E_diel = -7.05826168330221
+<class 'hsm.fixcav'> E_diel = -7.05826091056714
+<class 'hsm.fixcav'> E_diel = -7.05826100725494
+<class 'hsm.fixcav'> E_diel = -7.06151136822849
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000000000    -0.0013443014     0.0139818249
+1 H     0.0000000000     0.0054754979    -0.0075351481
+2 H     0.0000000000    -0.0041311965    -0.0064466768
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.451292244439 AA    0.000000000000  -1.421701395451  -0.852818744131 Bohr
+
+
+
+******** <class 'pyscf.scf.hf.PCMRHF_Scanner'> ********
+method = PCMRHF_Scanner
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+diis_damp = 0
+SCF conv_tol = 1e-10
+SCF conv_tol_grad = 1e-06
+SCF max_cycles = 50
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /tmp/tmpfn6y_mva
+max_memory 4000 MB (current use 191 MB)
+******** <class 'hsm.fixcav'> (In testing) ********
+
+WARN: PCM is an experimental feature. It is still in testing.
+Features and APIs may be changed in the future.
+
+lebedev_order = 17 (110 grids per sphere)
+eps = 80.151
+frozen = False
+surface area: 164.8639700429689
+<class 'hsm.fixcav'> E_diel = -0.0118480012087332
+Solvent Energy = -0.0118480012087332
+init E= -76.0649297239961
+  HOMO = -0.506018365749555  LUMO = 0.155707400960097
+<class 'hsm.fixcav'> E_diel = -0.0118223697577021
+Solvent Energy = -0.0118223697577021
+cycle= 1 E= -76.0670961915529  delta_E= -0.00217  |g|= 0.00147  |ddm|= 0.00317
+  HOMO = -0.505432374375273  LUMO = 0.156009094832161
+<class 'hsm.fixcav'> E_diel = -0.0118183274139481
+Solvent Energy = -0.0118183274139481
+cycle= 2 E= -76.0670967045698  delta_E= -5.13e-07  |g|= 0.000592  |ddm|= 0.00101
+  HOMO = -0.505679130827972  LUMO = 0.155967663077358
+<class 'hsm.fixcav'> E_diel = -0.0118195405855996
+Solvent Energy = -0.0118195405855996
+cycle= 3 E= -76.0670967742048  delta_E= -6.96e-08  |g|= 0.000211  |ddm|= 0.000356
+  HOMO = -0.505640041735126  LUMO = 0.155970036268005
+<class 'hsm.fixcav'> E_diel = -0.011816852835828
+Solvent Energy = -0.011816852835828
+cycle= 4 E= -76.0670967905867  delta_E= -1.64e-08  |g|= 6.41e-05  |ddm|= 0.000183
+  HOMO = -0.505654520753959  LUMO = 0.155969034846124
+<class 'hsm.fixcav'> E_diel = -0.011816038344817
+Solvent Energy = -0.011816038344817
+cycle= 5 E= -76.0670967930309  delta_E= -2.44e-09  |g|= 1.3e-05  |ddm|= 9.42e-05
+  HOMO = -0.505653730368788  LUMO = 0.155969740013295
+<class 'hsm.fixcav'> E_diel = -0.0118157219594593
+Solvent Energy = -0.0118157219594593
+cycle= 6 E= -76.0670967931443  delta_E= -1.13e-10  |g|= 1.93e-06  |ddm|= 2.18e-05
+  HOMO = -0.505654208571292  LUMO = 0.155969745673863
+<class 'hsm.fixcav'> E_diel = -0.011815696589032
+Solvent Energy = -0.011815696589032
+cycle= 7 E= -76.067096793146  delta_E= -1.71e-12  |g|= 2.32e-07  |ddm|= 2.78e-06
+  HOMO = -0.505654202014483  LUMO = 0.155969750308243
+<class 'hsm.fixcav'> E_diel = -0.0118156969098417
+Solvent Energy = -0.0118156969098417
+Extra cycle  E= -76.0670967931464  delta_E= -3.13e-13  |g|= 8.91e-08  |ddm|= 2.65e-07
+converged SCF energy = -76.0670967931464
+
+******** <class 'pyscf.mp.mp2.MP2_Scanner'> ********
+nocc = 5, nmo = 58
+max_memory 4000 MB (current use 191 MB)
+E(MP2_Scanner) = -76.3419033449768  E_corr = -0.274806551830442
+E(SCS-MP2_Scanner) = -76.3391340631156  E_corr = -0.272037269969251
+E_corr(same-spin) = -0.0666122218007066
+E_corr(oppo-spin) = -0.208194330029735
+<class 'hsm.fixcav'> E_diel = -7.05875111498129
+<class 'hsm.fixcav'> E_diel = -7.05891339087384
+<class 'hsm.fixcav'> E_diel = -7.05797862032321
+<class 'hsm.fixcav'> E_diel = -7.0579562607833
+<class 'hsm.fixcav'> E_diel = -7.05810819011557
+<class 'hsm.fixcav'> E_diel = -7.05808129138187
+<class 'hsm.fixcav'> E_diel = -7.05808049599047
+<class 'hsm.fixcav'> E_diel = -7.05808059285362
+<class 'hsm.fixcav'> E_diel = -7.06133612140434
+--------------- MP2_Scanner gradients ---------------
+         x                y                z
+0 O    -0.0000000000     0.0013284007     0.0163801320
+1 H    -0.0000000000     0.0051716846    -0.0076479847
+2 H     0.0000000000    -0.0065000853    -0.0087321473
+----------------------------------------------
+New geometry
+   1 O      0.000000000000   0.000000000000   0.149892716770 AA    0.000000000000   0.000000000000   0.283256182762 Bohr
+
+   2 H      0.000000000000   0.752331979206  -0.448646358385 AA    0.000000000000   1.421701395451  -0.847818744131 Bohr
+
+   3 H      0.000000000000  -0.752331979206  -0.448646358385 AA    0.000000000000  -1.421701395451  -0.847818744131 Bohr
+
+
+Vibration frequency calculation (cm^-1)
+w projection of trans & rot
+----------------------------------------
+Mode  1:     38.83      [Real]
+Mode  2:     73.98      [Real]
+Mode  3:     70.91      [Real]
+Mode  4:    364.02      [Real]
+Mode  5:    284.50      [Real]
+Mode  6:    429.72      [Real]
+----------------------------------------
+
+
+Thermochemistry  [T = 298.15 K]
++--------------+---------+---------+----------+----------+
+| Quantity     |   Trans |     Rot |      Vib |    Total |
+|--------------+---------+---------+----------+----------|
+| E (kJ/mol)   | 3.74727 | 4.62601 | 56.81097 | 65.18425 |
+| S (kJ/mol/K) | 0.05644 | 0.01452 |  0.00002 |  0.07099 |
++--------------+---------+---------+----------+----------+
+
+kJ/mol -> kcal/mol
++----------------+---------+---------+----------+----------+
+| Quantity       |   Trans |     Rot |      Vib |    Total |
+|----------------+---------+---------+----------+----------|
+| E (kcal/mol)   | 0.89562 | 1.10565 | 13.57816 | 15.57943 |
+| S (kcal/mol/K) | 0.01349 | 0.00347 |  0.00001 |  0.01697 |
++----------------+---------+---------+----------+----------+
