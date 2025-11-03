@@ -47,6 +47,9 @@ def run_sp_mp2(mf) -> Dict[str, Any]:
         escf = mf.e_tot
     from pyscf import mp as _mp
     mymp = _mp.MP2(mf)
+    pcm = getattr(mf, "with_solvent", None)
+    if pcm is not None:
+        mymp = mymp.PCM(pcm)
     emp2, _ = mymp.kernel()  # returns (e_corr, t2) ; mymp.e_tot = escf + e_corr
     out = {
         "scf_energy": float(escf),
@@ -65,21 +68,20 @@ def run_opt_mp2(mf) -> Dict[str, Any]:
     from pyscf.geomopt import geometric_solver, addons
     from pyscf import mp as _mp
     mymp = _mp.MP2(mf)
+    pcm = getattr(mf, "with_solvent", None)
+    if pcm is not None:
+        mymp = mymp.PCM(pcm)
     scan = mymp.nuc_grad_method().as_scanner()  # [mol] -> (E, grad)
     mwrap = addons.as_pyscf_method(mf.mol, scan)
     mol_opt = geometric_solver.optimize(mwrap, maxsteps=200)
     return {"opt_coords_ang": mol_opt.atom_coords(unit="Angstrom").tolist(), "mp2_optimized": True}
-
-    print("\n=== Geometry Optimization (geomeTRIC) ===")
-    mol_opt = geometric_solver.optimize(mf, maxsteps=200)
-    return {"opt_coords_ang": mol_opt.atom_coords(unit="Angstrom").tolist()}
 
 def _is_pcm_hessian(obj) -> bool:
     """Heuristics: return True if Hessian object is already PCM-aware."""
     try:
         # Class name check (e.g., 'PCMHessian', 'WithSolventHess', etc.)
         name = obj.__class__.__name__.lower()
-        if "pcm" in name or "withsolvent" in name:
+        if "pcm" in name or "with_solvent" in name:
             return True
     except Exception:
         pass
@@ -181,7 +183,7 @@ def thermo_from_loaded_freqs(mol, freqs_cm1: Iterable[complex], temps: Iterable[
     mass   = mol.atom_mass_list(isotope_avg=True)
     coords = mol.atom_coords(unit="Bohr")
     hess0  = np.zeros((natm, natm, 3, 3), dtype=float)
-    tr_cm1 = hsm_thermo.compute_tr_frequencies(hess0, mass, coords)  # cm^-1
+    tr_cm1 = thermo.compute_tr_frequencies(hess0, mass, coords)  # cm^-1
 
     tables = thermo_tables_from_freqs(np.asarray(tr_cm1), np.asarray(vib_cm1), temps)
 
@@ -200,10 +202,10 @@ def _harmonic_analysis_from_hessian(mf, hess: np.ndarray, *, project: bool, freq
         mf.mol, hess, imaginary_freq=True, exclude_trans=False, exclude_rot=False
     )
 
-    freqs_tr = hsm_thermo.compute_tr_frequencies(hess, mass, coords)
-    tr, vib, full, nTR = hsm_thermo.collect_freq(mass, coords, info, freqs_tr)
+    freqs_tr = thermo.compute_tr_frequencies(hess, mass, coords)
+    tr, vib, full, nTR = thermo.collect_freq(mass, coords, info, freqs_tr)
 
-    _ = hsm_thermo.show_frequencies(mass, coords, hess, info)
+    _ = thermo.show_frequencies(mass, coords, hess, info)
 
     raw_freqs = np.asarray(info["freq_wavenumber"]).ravel()
     projected_full = np.asarray(full).ravel()
@@ -249,7 +251,9 @@ def run_hess(mf, *, project: bool = False, freqtemps: Iterable[float] = (298.15,
 
     # Analytic solvent Hessian (robust factory expected to handle .base MRO issues)
     print("\n=== Numerical Hessian (solvent) ===")
-    hobj = _make_pcm_hessian_object_robust(mf)  # must exist in your codebase
+    if getattr(mf, "with_solvent", None) is None:
+        print("[warn] SCF Hessian is vacuum. (mf.with_solvent is not found.）")
+    hobj = _make_pcm_hessian_object_robust(mf)
     hess = hobj.kernel()  # shape: (natm, natm, 3, 3)
     out["hessian"] = hess
 
@@ -265,8 +269,13 @@ def run_hess(mf, *, project: bool = False, freqtemps: Iterable[float] = (298.15,
     )
     return out
 
-
-def run_mp2(mf, *, project: bool = False, freqtemps: Iterable[float] = (298.15,), fd_step: float = 1e-3) -> Dict[str, Any]:
+def run_mp2(
+    mf,
+    *,
+    project: bool = False,
+    freqtemps: Iterable[float] = (298.15,),
+    fd_step: float = 5.0e-3,
+) -> Dict[str, Any]:
     out: Dict[str, Any] = {"project": bool(project)}
 
     # Reference SCF
@@ -286,6 +295,7 @@ def run_mp2(mf, *, project: bool = False, freqtemps: Iterable[float] = (298.15,)
     # Numerical Hessian via finite differences of MP2 gradients
     print("\n=== Numerical Hessian (MP2) ===")
     grad_method = mp2_solver.nuc_grad_method()
+    grad_method.verbose = 4
     if hasattr(grad_method, "conv_tol"):
         grad_method.conv_tol = getattr(grad_method, "conv_tol") or 1e-6
     if hasattr(grad_method, "stepsize"):

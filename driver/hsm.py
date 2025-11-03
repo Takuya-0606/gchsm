@@ -73,21 +73,32 @@ def attach_pcm(mf, mol, hsm_cfg: Dict[str, Any]):
     UserCavityPCM = _load_user_cavity_pcm()
 
     if UserCavityPCM is not None:
-        # fixed cavity centers = current atom positions (Angstrom)
         centers_ang = mol.atom_coords(unit="Angstrom")
-        cm = UserCavityPCM(mol, centers=centers_ang, eps=eps, method=scrf)
-        if hasattr(cm, "vdw_scale"):       cm.vdw_scale = alpha
-        if hasattr(cm, "lebedev_order"):   cm.lebedev_order = grid
-        if hasattr(cm, "conv_tol"):        cm.conv_tol = 1e-12
-        cm.build()
-        mf = mf.PCM(cm)
-        # Diagnostics
+        cm = UserCavityPCM(
+            mol,
+            centers=centers_ang,
+            radii=alpha,
+            unit="Angstrom",
+            method=scrf,
+            eps=eps,
+        )
+        if hasattr(cm, "lebedev_order"):
+            cm.lebedev_order = grid
+        if hasattr(cm, "conv_tol"):
+            cm.conv_tol = 1e-12
+        mf_pcm = cm.attach_to(
+            mf,
+            build_surface=True,
+            lebedev_order=grid,
+            conv_tol=1e-10,
+            conv_tol_grad=1e-6,
+        )
         try:
-            ws = getattr(mf, "with_solvent", None)
+            ws = getattr(mf_pcm, "with_solvent", None)
             print(f"[info] Using UserCavityPCM: {type(ws).__name__}")
         except Exception:
             print("[info] Using UserCavityPCM (attached)")
-        return mf
+        return mf_pcm
 
     # Fallback to standard PCM
     cm = pcm_mod.PCM(mol)
@@ -97,10 +108,12 @@ def attach_pcm(mf, mol, hsm_cfg: Dict[str, Any]):
     if hasattr(cm, "lebedev_order"): cm.lebedev_order = grid
     if hasattr(cm, "conv_tol"):      cm.conv_tol = 1e-12
     cm.build()
-    mf = mf.PCM(cm)
+    mf_pcm = mf.PCM(cm)
+    mf_pcm.conv_tol = 1e-10
+    mf_pcm.conv_tol_grad = 1e-6
     try:
-        ws = getattr(mf, "with_solvent", None)
+        ws = getattr(mf_pcm, "with_solvent", None)
         print(f"[info] Using standard PCM: {type(ws).__name__}")
     except Exception:
         print("[info] Using standard PCM (attached)")
-    return mf
+    return mf_pcm
