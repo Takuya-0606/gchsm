@@ -10,7 +10,7 @@ mol = gto.M(atom="""
   O           0.00000000000000      0.00000000000000      0.14989271676966
   H           0.00000000000000      0.75233197920560     -0.44864635838483
   H           0.00000000000000     -0.75233197920560     -0.44864635838484
-""", unit="Ang", basis="cc-pvtz", verbose=1)
+""", unit="Ang", basis="sto-3g", verbose=1)
 
 pcm = fixcav(mol,
                     centers=mol.atom_coords(unit="Angstrom"),
@@ -23,7 +23,7 @@ pcm.build()
 mf = pcm.attach_to(scf.RHF(mol), build_surface=False)
 mf.kernel()
 
-hess = pcm.mp2_frequency(mf, mp2_df=True, disp_bohr=5e-3)
+hess = pcm.mp2_frequency(mf, disp_bohr=5e-3)
 
 freq_info = thermo.harmonic_analysis(
         mf.mol,
