@@ -92,7 +92,7 @@ The following program was implemented by appending to the pyscf program.
 3. The program writes a detailed report next to the input file (for the example above, the output is `input.out`).  When `CALCTYPE=freq` is specified, the program expects a `freq.out` file in the same folder that contains tabulated vibrational frequencies; the thermochemical tables are then generated from that data.
 
 ## Important Note
-Currently, vibrational frequency calculations cannot be performed with `METHOD=MP2`
+Currently, vibrational frequency calculation`hess` cannot be performed with `METHOD=HF` or `METHOD=DFT`
 
 ## 4. Updating or uninstalling
 - To pick up the latest changes from this repository, update the sources (for
