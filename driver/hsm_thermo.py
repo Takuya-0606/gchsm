@@ -26,6 +26,8 @@ from tabulate import tabulate
 from pyscf.data import nist
 from pyscf.hessian import thermo as th  # use original functions
 
+LINEAR_INERTIA_TOL = 1e-4
+
 def _print_list(title: str, freqs_cm1) -> None:
     """Print a frequency list (cm^-1) with simple Real/Imag labels (no colors)."""
     print()
@@ -46,8 +48,57 @@ def _print_list(title: str, freqs_cm1) -> None:
 
 # TR quasi-frequencies
 
+def _rotor_type_from_inertia(mass, coords, linear_tol=LINEAR_INERTIA_TOL):
+    mass = np.asarray(mass, dtype=float)
+    coords = np.asarray(coords, dtype=float)
+
+    if mass.size <= 1:
+        return "ATOM"
+
+    com = np.average(coords, axis=0, weights=mass)
+    shifted = coords - com
+
+    inertia = np.zeros((3, 3), dtype=float)
+    for m, (x, y, z) in zip(mass, shifted):
+        inertia[0, 0] += m * (y * y + z * z)
+        inertia[1, 1] += m * (x * x + z * z)
+        inertia[2, 2] += m * (x * x + y * y)
+        inertia[0, 1] -= m * (x * y)
+        inertia[0, 2] -= m * (x * z)
+        inertia[1, 2] -= m * (y * z)
+
+    inertia[1, 0] = inertia[0, 1]
+    inertia[2, 0] = inertia[0, 2]
+    inertia[2, 1] = inertia[1, 2]
+
+    eigvals = np.sort(np.abs(np.linalg.eigvalsh(inertia)))
+    largest = eigvals[-1]
+    if largest < 1e-12:
+        return "ATOM"
+    if eigvals[0] / largest < linear_tol:
+        return "LINEAR"
+    return "REGULAR"
+
+
+def _classify_rotor_type(mass, coords):
+    rot_const = th.rotation_const(mass, coords)
+    rotor_type = th._get_rotor_type(rot_const)
+    if rotor_type == "REGULAR":
+        inertia_type = _rotor_type_from_inertia(mass, coords)
+        if inertia_type != "REGULAR":
+            rotor_type = inertia_type
+    return rotor_type
+
+
 def compute_tr_frequencies(hess, mass, coords):
     natm = len(mass)
+
+    # Center the coordinates (PySCF does this internally before building TR).
+    coords = np.asarray(coords, dtype=float)
+    mass = np.asarray(mass, dtype=float)
+    mass_center = np.einsum("z,zx->x", mass, coords) / mass.sum()
+    coords_centered = coords - mass_center
+
     # Reshape to 3N x 3N and symmetrize (numerical safety).
     H = hess.transpose(0, 2, 1, 3).reshape(3 * natm, 3 * natm)
     Hs = 0.5 * (H + H.T)
@@ -57,28 +108,77 @@ def compute_tr_frequencies(hess, mass, coords):
     H_mass = Hs * mhalf[:, None] * mhalf[None, :]
 
     # Build TR basis from original helper.
-    TR = np.vstack(th._get_TR(mass, coords))  # using original private helper
+    tr_raw = th._get_TR(mass, coords_centered)  # using original private helper
 
-    # Normalize each TR vector.
-    TR = TR / np.linalg.norm(TR, axis=1)[:, None]
+    # Determine how many rotation vectors we need.
+    rotor_type = _classify_rotor_type(mass, coords_centered)
+    rot_idx = []
+    if rotor_type == "LINEAR":
+        rot_idx = [3, 4]
+    elif rotor_type not in ("ATOM", "LINEAR"):
+        rot_idx = [3, 4, 5]
 
-    # Force constants in the TR subspace.
-    fconsts = np.array([v @ H_mass @ v for v in TR])
+    # Selected raw vectors in the desired order (translations first).
+    selected = [tr_raw[i].astype(float) for i in (0, 1, 2, *rot_idx)]
+    categories = ["trans"] * 3 + ["rot"] * len(rot_idx)
 
-    # Convert to cm^-1.
+    # Orthonormalize the selected vectors (Gram-Schmidt) so the projection does not
+    # mix vibrational modes back into the TR subspace.
+    ortho = []
+    used_categories = []
+    for vec, cat in zip(selected, categories):
+        w = vec.copy()
+        for b in ortho:
+            w -= np.dot(b, w) * b
+        norm = np.linalg.norm(w)
+        if norm < 1e-10:
+            continue
+        ortho.append(w / norm)
+        used_categories.append(cat)
+
+    if len(ortho) < 3:
+        raise ValueError("Failed to build three linearly independent translational vectors")
+
+    B = np.vstack(ortho)
+
+    # Force constants in the TR subspace (diagonalise the projected Hessian).
+    H_sub = B @ H_mass @ B.T
+    eigvals, eigvecs = np.linalg.eigh(0.5 * (H_sub + H_sub.T))
+
+    # Convert eigenvalues to frequencies (cm^-1).
     au2hz = (nist.HARTREE2J / (nist.ATOMIC_MASS * nist.BOHR_SI**2)) ** 0.5 / (2 * np.pi)
-    freq_cm1 = np.sqrt(np.abs(fconsts)) * au2hz / nist.LIGHT_SPEED_SI * 1e-2
+    freqs = np.sqrt(np.clip(eigvals, 0.0, None)) * au2hz / nist.LIGHT_SPEED_SI * 1e-2
+
+    # Classify modes by their contribution to the translation/rotation subspaces.
+    mode_info = []
+    cats = np.array(used_categories)
+    for freq, coeffs in zip(freqs, eigvecs.T):
+        trans_weight = float(np.sum(coeffs[cats == "trans"] ** 2))
+        rot_weight = float(np.sum(coeffs[cats == "rot"] ** 2))
+        mode_info.append((freq, trans_weight, rot_weight))
+
+    mode_info.sort(key=lambda x: x[0])
+    trans_modes, rot_modes = [], []
+    for freq, t_w, r_w in mode_info:
+        prefer_trans = t_w >= r_w
+        if prefer_trans and len(trans_modes) < 3:
+            trans_modes.append(freq)
+        elif len(rot_modes) < len(mode_info) - 3:
+            rot_modes.append(freq)
+        else:
+            trans_modes.append(freq) if len(trans_modes) < 3 else rot_modes.append(freq)
+
+    freq_cm1 = np.array([*trans_modes, *rot_modes])
 
     _print_list("with projection of translations & rotations", freq_cm1)
     return freq_cm1
 
 
-# Frequency collection/print
+
 
 def _n_tr(mass, coords) -> int:
     """Return the number of overall TR modes (3/5/6) for atom/linear/nonlinear."""
-    rot_const = th.rotation_const(mass, coords)
-    rotor_type = th._get_rotor_type(rot_const)  # using original private helper
+    rotor_type = _classify_rotor_type(mass, coords)
     return 3 if rotor_type == "ATOM" else 5 if rotor_type == "LINEAR" else 6
 
 def collect_freq(mass, coords, results_from_harmonic, freqs_tr_cm1):
