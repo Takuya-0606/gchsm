@@ -35,6 +35,7 @@ from pyscf import lib
 from pyscf.data import nist
 
 LINDEP_THRESHOLD = 1e-7
+LINEAR_INERTIA_TOL = 1e-4
 
 
 def harmonic_analysis(mol, hess, exclude_trans=True, exclude_rot=True,
@@ -130,40 +131,121 @@ def _print_list(title, freqs):
             print("-"*40)
             print()
 
+def _rotor_type_from_inertia(mass, coords, linear_tol=LINEAR_INERTIA_TOL):
+    mass = numpy.asarray(mass, dtype=float)
+    coords = numpy.asarray(coords, dtype=float)
+
+    if mass.size <= 1:
+        return 'ATOM'
+
+    com = numpy.average(coords, axis=0, weights=mass)
+    shifted = coords - com
+
+    inertia = numpy.zeros((3, 3), dtype=float)
+    for m, (x, y, z) in zip(mass, shifted):
+        inertia[0, 0] += m * (y * y + z * z)
+        inertia[1, 1] += m * (x * x + z * z)
+        inertia[2, 2] += m * (x * x + y * y)
+        inertia[0, 1] -= m * (x * y)
+        inertia[0, 2] -= m * (x * z)
+        inertia[1, 2] -= m * (y * z)
+
+    inertia[1, 0] = inertia[0, 1]
+    inertia[2, 0] = inertia[0, 2]
+    inertia[2, 1] = inertia[1, 2]
+
+    eigvals = numpy.sort(numpy.abs(numpy.linalg.eigvalsh(inertia)))
+    largest = eigvals[-1]
+    if largest < 1e-12:
+        return 'ATOM'
+    if eigvals[0] / largest < linear_tol:
+        return 'LINEAR'
+    return 'REGULAR'
+
+
+def _classify_rotor_type(mass, coords):
+    rot_const = rotation_const(mass, coords)
+    rotor_type = _get_rotor_type(rot_const)
+    if rotor_type == 'REGULAR':
+        inertia_type = _rotor_type_from_inertia(mass, coords)
+        if inertia_type != 'REGULAR':
+            rotor_type = inertia_type
+    return rotor_type
+
+
 def compute_tr_frequencies(hess, mass, coords):
-    import numpy as np
     natm = len(mass)
+
+    coords = numpy.asarray(coords, dtype=float)
+    mass = numpy.asarray(mass, dtype=float)
+    mass_center = numpy.einsum('z,zx->x', mass, coords) / mass.sum()
+    coords_centered = coords - mass_center
+
     H = hess.transpose(0,2,1,3).reshape(3*natm, 3*natm)
+    Hs = 0.5 * (H + H.T)
 
-    remake = numpy.zeros((natm*3, natm*3))
-    for i in range(natm*3):
-        for j in range(natm*3):
-            remake[i,j] = H[i,j]
-            remake[j,i] = H[i,j]
+    mhalf = numpy.repeat(mass**-0.5, 3)
+    H_mass = Hs * mhalf[:,None] * mhalf[None,:]
     
-    # mass-weighted Hessian
-    mhalf = np.repeat(mass**-0.5, 3)
-    H_mass = remake * mhalf[:,None] * mhalf[None,:]
+    tr_raw = _get_TR(mass, coords_centered)
 
-    # TR vector
-    TR = np.vstack(_get_TR(mass, coords))
+    rot_const = rotation_const(mass, coords_centered)
+    rotor_type = _get_rotor_type(rot_const)
+    rot_idx = []
+    if rotor_type == 'LINEAR':
+        rot_idx = [3, 4]
+    elif rotor_type not in ('ATOM', 'LINEAR'):
+        rot_idx = [3, 4, 5]
 
-    # Normalization
-    TR = TR / np.linalg.norm(TR, axis=1)[:, None]
+    selected = [tr_raw[i].astype(float) for i in (0, 1, 2, *rot_idx)]
+    categories = ['trans'] * 3 + ['rot'] * len(rot_idx)
 
-    # force constant
-    force_consts = np.array([v @ H_mass @ v for v in TR])
+    ortho = []
+    used_categories = []
+    for vec, cat in zip(selected, categories):
+        w = vec.copy()
+        for b in ortho:
+            w -= numpy.dot(b, w) * b
+        norm = numpy.linalg.norm(w)
+        if norm < 1e-10:
+            continue
+        ortho.append(w / norm)
+        used_categories.append(cat)
 
-    # frequency
-    au2hz = (nist.HARTREE2J / (nist.ATOMIC_MASS * nist.BOHR_SI**2))**.5 / (2 * np.pi)
-    freq_cm1 = np.sqrt(np.abs(force_consts)) * au2hz / nist.LIGHT_SPEED_SI * 1e-2
-    #_print_list("w projection of trans & rot", freq_cm1)
-    return freq_cm1
+    if len(ortho) < 3:
+        raise ValueError('Failed to build three linearly independent translational vectors')
+
+    B = numpy.vstack(ortho)
+
+    H_sub = B @ H_mass @ B.T
+    eigvals, eigvecs = numpy.linalg.eigh(0.5 * (H_sub + H_sub.T))
+
+    au2hz = (nist.HARTREE2J / (nist.ATOMIC_MASS * nist.BOHR_SI**2))**.5 / (2 * numpy.pi)
+    freqs = numpy.sqrt(numpy.clip(eigvals, 0.0, None)) * au2hz / nist.LIGHT_SPEED_SI * 1e-2
+
+    mode_info = []
+    cats = numpy.asarray(used_categories)
+    for freq, coeffs in zip(freqs, eigvecs.T):
+        trans_weight = float(numpy.sum(coeffs[cats == 'trans'] ** 2))
+        rot_weight = float(numpy.sum(coeffs[cats == 'rot'] ** 2))
+        mode_info.append((freq, trans_weight, rot_weight))
+
+    mode_info.sort(key=lambda x: x[0])
+    trans_modes, rot_modes = [], []
+    for freq, t_w, r_w in mode_info:
+        prefer_trans = t_w >= r_w
+        if prefer_trans and len(trans_modes) < 3:
+            trans_modes.append(freq)
+        elif len(rot_modes) < len(mode_info) - 3:
+            rot_modes.append(freq)
+        else:
+            (trans_modes if len(trans_modes) < 3 else rot_modes).append(freq)
+
+    return numpy.array([*trans_modes, *rot_modes])
 
 def collect_freq(mass, atom_coords, results, freqs_tr_cm1):
     natm = atom_coords.shape[0]
-    rot_const  = rotation_const(mass, atom_coords)
-    rotor_type = _get_rotor_type(rot_const)
+    rotor_type = _classify_rotor_type(mass, atom_coords)    
     nTR = 3 if rotor_type=='ATOM' else 5 if rotor_type=='LINEAR' else 6
 
     # TR (3/5/6)
@@ -449,14 +531,30 @@ def _get_TR(mass, coords):
             Rx.ravel(), Ry.ravel(), Rz.ravel())
 
 
-def _get_rotor_type(rot_const):
-    if numpy.all(rot_const > 1e8):
-        rotor_type = 'ATOM'
-    elif rot_const[0] > 1e8 and (rot_const[1] - rot_const[2] < 1e-3):
-        rotor_type = 'LINEAR'
-    else:
-        rotor_type = 'REGULAR'
-    return rotor_type
+#def _get_rotor_type(rot_const, natm):
+#    if natm
+#    if numpy.all(rot_const > 1e8):
+#        rotor_type = 'ATOM'
+#    elif rot_const[0] > 1e8 and (rot_const[1] - rot_const[2] < 1e-3):
+#        rotor_type = 'LINEAR'
+#    else:
+#        rotor_type = 'REGULAR'
+#    return rotor_type
+def _get_rotor_type(rot_const, natm=None):
+    if natm == 1:
+        return 'ATOM'
+    if natm == 2:
+        return 'LINEAR'
+
+    INF_TH = 1e8
+    if numpy.all(rot_const > INF_TH):
+        return 'ATOM'
+    if rot_const[0] > INF_TH and (
+        abs(rot_const[1] - rot_const[2]) < 1e-3 or
+        abs(rot_const[1] - rot_const[2]) <= 1e-6 * max(abs(rot_const[1]), abs(rot_const[2]), 1.0)
+    ):
+        return 'LINEAR'
+    return 'REGULAR'
 
 
 def rotational_symmetry_number(mol):
